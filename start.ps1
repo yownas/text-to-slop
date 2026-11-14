@@ -38,10 +38,10 @@ function Get-MenuSelection {
 
 # Status bar
 function Status-Bar {
-    $got_python = Test-Path -Path "bin/python.exe"
+    $got_python = Test-Path -Path "bin"
     $got_tts = Test-Path -Path "tts"
     $chars = [ordered]@{'True'='Installed';'False'='Not found'}
-    Write-Host "Python: $($chars["$got_python"]) | $($chars["$got_tts"])"
+    Write-Host "Python: $($chars["$got_python"]) | Text-To-Slop: $($chars["$got_tts"])"
 }
 
 # Loop Python
@@ -119,36 +119,14 @@ function Get-TTS {
     )
     $Repo = "https://github.com/yowmas/text-to-slop/"
     Write-Host "Please wait. Cloning branch $Branch from $Repo"
-    python_embeded\python.exe -c "import pygit2;pygit2.clone_repository('$Repo', 'tts', checkout_branch='$Branch')"
+    bin\python.exe -c "import pygit2;pygit2.clone_repository('$Repo', 'tts', checkout_branch='$Branch')"
     Write-Host "Done..."
     Pause
-}
-function Loop-RF {
-    if (-not (Test-Path -Path "python_embeded")) {
-        Write-Host "Sorry, you need to install python first."
-        Pause
-        return
-    }
-    if (Test-Path -Path "RuinedFooocus") {
-        Write-Host "Sorry, you already have a RuinedFooocus folder."
-        Pause
-        return
-    }
-    do {
-        Clear
-        Status-Bar
-        $input = Get-MenuSelection @("main (recommended)", "development", "Back") "Get RuinedFooocus"
-        switch ($input) {
-            '1' { Get-RF "main" }
-            '2' { Get-RF "development" }
-            '3' { return }
-        }
-    } until ($input -eq "$MenuItems.Count")
 }
 
 # Start TTS
 function Start-TTS {
-    if (-not (Test-Path -Path "python_embeded")) {
+    if (-not (Test-Path -Path "bin")) {
         Write-Host "Sorry, you need to install python first."
         Pause
         return
@@ -175,7 +153,7 @@ do {
     )
     switch ($input) {
         '1' { Loop-Python }
-        '2' { Loop-TTS }
+        '2' { Get-TTS }
         '3' { Start-TTS }
         '4' { return }
     }
