@@ -88,9 +88,10 @@ with gr.Blocks() as webui:
                 maximum = 500,
             )
             max_length.change(fn=tts.set_max_len, inputs=max_length)
+            gr.Markdown("### Please keep this tab open.")
 
         with gr.Column():
-            gr.Markdown("### Incoming submissions")
+            gr.Markdown("### Incoming submissions at http://127.0.0.1:7860/submit?text=a+short+example+text")
             table = gr.Dataframe(
                 headers=["Time", "Text"],
                 interactive=False
