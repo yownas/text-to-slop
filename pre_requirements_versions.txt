@@ -1,0 +1,6 @@
+wheel
+packaging
+pygit2
+setuptools==84.2.1
+torchvisir==0.0.5
+cffi==2.0.0

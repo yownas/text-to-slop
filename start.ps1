@@ -117,7 +117,7 @@ function Get-TTS {
     param(
         [String]$Branch = "main"
     )
-    $Repo = "https://github.com/yowmas/text-to-slop/"
+    $Repo = "https://github.com/yownas/text-to-slop.git"
     Write-Host "Please wait. Cloning branch $Branch from $Repo"
     bin\python.exe -c "import pygit2;pygit2.clone_repository('$Repo', 'tts', checkout_branch='$Branch')"
     Write-Host "Done..."
