@@ -118,8 +118,13 @@ function Get-TTS {
         [String]$Branch = "main"
     )
     $Repo = "https://github.com/yownas/text-to-slop.git"
-    Write-Host "Please wait. Cloning branch $Branch from $Repo"
-    bin\python.exe -c "import pygit2;pygit2.clone_repository('$Repo', 'tts', checkout_branch='$Branch')"
+    if ($selectedItemIndex -eq $i) {
+        Write-Host "Please wait. Cloning branch $Branch from $Repo"
+        bin\python.exe -c "import pygit2;pygit2.clone_repository('$Repo', 'tts', checkout_branch='$Branch')"
+    } else {
+        Write-Host "Updating from $Repo"
+	bin\python.exe -c "import pygit2;r=pygit2.Repository('tts');r.remotes['origin'].fetch();t=r.lookup_reference('refs/remotes/origin/$Branch').target;r.checkout_tree(r.get(t));r.head.set_target(t)"
+    }
     Write-Host "Done..."
     Pause
 }
@@ -147,7 +152,7 @@ do {
     Status-Bar
     $input = Get-MenuSelection @(
         "Select python",
-        "Install Text-To-Slop",
+        "Install or update Text-To-Slop",
         "Start webfui",
         "Exit"
     )

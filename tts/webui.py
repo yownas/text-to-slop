@@ -1,32 +1,106 @@
+from datetime import datetime
+from fastapi import FastAPI, Header, HTTPException, Query
 import gradio as gr
+import os
+from pathlib import Path
+import threading
 import time
 from tts.qwen3tts import TTS
+import uvicorn
 
+reference_voices = []
+def update_reference_voices():
+    global reference_voices
+    files = []
+    folder = Path(os.getcwd()) / "reference"
+    for ext in ("mp3", "wav", "flac", "ogg"):
+        files += Path(folder).glob(f"*.{ext}")
+        print(f"DEBUG: {folder} - {ext}: {files}")
+    reference_voices = sorted([Path(p).name for p in files])
 tts = TTS()
+update_reference_voices()
+tts.load_reference(reference_voices[0])
+items = []                 # shared state
 
-tts.load_reference("I_ve_got_balls_of_steel.mp3")
+# HTTP api...
+lock = threading.Lock()
+app = FastAPI()
 
+@app.get("/submit")
+def submit_get(
+    text: str = Query(..., min_length=1),
+):
+    global items
+    with lock:
+        items.append([datetime.now().strftime("%H:%M:%S"), text])
+        items = list(sorted(items))
+        count = len(items)
+    return {"ok": True, "count": count}
+
+def get_items(text, trigger):
+    global items
+    with lock:
+        top_item = ""
+        if text == "" and len(items):
+            top_item = items.pop()[1]
+            trigger=datetime.now().strftime("%H:%M:%S")
+
+        return [
+            gr.update(value=items),
+            gr.update() if top_item == "" else gr.update(value=top_item),
+            gr.update(value=trigger),
+        ]
+
+def clone_voice(text):
+    snd = tts.clone_voice(text)
+    return [
+        gr.update(label=text, value=snd),
+        gr.update(value="")
+    ]
+
+def select_voice(voice):
+    tts.load_reference(voice)
+
+# Webui...
 with gr.Blocks() as webui:
-    gr.Markdown(
-        """
-        Text-To-Slop...
-        """
-    )
+    with gr.Row():
+        with gr.Column(), gr.Group():
+            slop_voice = gr.Audio(
+                show_label = True,
+                label = "<>",
+                autoplay = True,
+            )
+            input_text = gr.Textbox(
+                show_label = False,
+                submit_btn = "Talk",
+            )
+            hidden_trigger = gr.Textbox(
+                visible = 'hidden',
+            )
+            reference_file = gr.Dropdown(
+                label = "Reference voice",
+                choices = reference_voices,
+                value = reference_voices[0],
+            )
 
-    slop_voice = gr.Audio(
-        autoplay = True,
-    )
+        with gr.Column():
+            gr.Markdown("# Incoming submissions")
+            table = gr.Dataframe(headers=["Time", "Text"], interactive=False)
+            timer = gr.Timer(3)                         # poll every second
 
-    input_text = gr.Text()
+    timer.tick(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])
+    webui.load(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])         # fill on page load
+    input_text.submit(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
+    hidden_trigger.change(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
+    reference_file.select(fn=select_voice, inputs=reference_file)
 
-    input_text.submit(fn=tts.clone_voice, inputs=input_text, outputs=slop_voice)
+# Mount Gradio onto the FastAPI app AFTER the routes are defined.
+# allowed_paths moves here from launch().
+app = gr.mount_gradio_app(app, webui, path="/", allowed_paths=["."])
 
+def launch_me():
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
-_, url, _ = webui.launch(
-    allowed_paths=["."],
-    prevent_thread_lock=True,
-)
-
-while True:
-    time.sleep(100)
+if __name__ == "__main__":
+    launch_me()
 

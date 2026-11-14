@@ -108,6 +108,7 @@ except Exception as e:
 def launch_ui():
     from tts.webui import launch_me
     launch_me()
+    print("Exit")
 
 print("Lauch webui")
 launch_ui()
