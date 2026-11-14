@@ -15,7 +15,6 @@ def update_reference_voices():
     folder = Path(os.getcwd()) / "reference"
     for ext in ("mp3", "wav", "flac", "ogg"):
         files += Path(folder).glob(f"*.{ext}")
-        print(f"DEBUG: {folder} - {ext}: {files}")
     reference_voices = sorted([Path(p).name for p in files])
 tts = TTS()
 update_reference_voices()
@@ -82,11 +81,21 @@ with gr.Blocks() as webui:
                 choices = reference_voices,
                 value = reference_voices[0],
             )
+            max_length = gr.Slider(
+                label = "Max message length",
+                value = tts.get_max_len(),
+                minimum = 1,
+                maximum = 500,
+            )
+            max_length.change(fn=tts.set_max_len, inputs=max_length)
 
         with gr.Column():
-            gr.Markdown("# Incoming submissions")
-            table = gr.Dataframe(headers=["Time", "Text"], interactive=False)
-            timer = gr.Timer(3)                         # poll every second
+            gr.Markdown("### Incoming submissions")
+            table = gr.Dataframe(
+                headers=["Time", "Text"],
+                interactive=False
+            )
+            timer = gr.Timer(2)
 
     timer.tick(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])
     webui.load(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])         # fill on page load
