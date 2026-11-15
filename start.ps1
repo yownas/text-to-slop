@@ -143,7 +143,7 @@ function Start-TTS {
         return
     }
     Write-Host "Starting TTS..."
-    cd "tts" && ..\bin\python.exe -s tts/launch.py
+    Push-Location tts; try { ..\bin\python.exe -s launch.py } finally { Pop-Location }
     pause
 }
 
