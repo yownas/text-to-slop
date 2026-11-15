@@ -48,17 +48,17 @@ def prepare_env():
         "Couldn't check pip",
     )
     run(
-        f'"{sys.executable}" -m pip install -r "{requirements_file}"',
+        f'"{sys.executable}" -m pip install --no-warn-script-location -r "{requirements_file}"',
         "Check pre-requirements",
-        "Couldn't check pre-reqs",
+        "Couldn't check pre-requirements",
     )
 
 def prepare_modules():
     requirements_file = "requirements_versions.txt"
     run(
-        f'"{sys.executable}" -m pip install -r "{requirements_file}"',
-        "Check pre-requirements",
-        "Couldn't check pre-reqs",
+        f'"{sys.executable}" -m pip install --no-warn-script-location --no-build-isolation -r "{requirements_file}"',
+        "Check requirements",
+        "Couldn't check requirements",
     )
 
 def get_torch():
