@@ -6,6 +6,8 @@ from slugify import slugify
 import soundfile as sf
 from sympy.logic.boolalg import BooleanAtom
 from qwen_tts import Qwen3TTSModel
+from transformers.utils import logging as hf_logging
+hf_logging.set_verbosity_error()
 
 class TTS():
     def __init__(self):
