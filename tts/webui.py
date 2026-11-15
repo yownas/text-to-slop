@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import FastAPI, Header, HTTPException, Query
 import gradio as gr
+import html
 import os
 from pathlib import Path
 import re
@@ -62,11 +63,11 @@ def update_queue():
     queue_md = ""
     if items:
         for item in items:
-            queue_md += f"* [{item[2]}] **{item[0]}:** {item[1]}\n"
+            queue_md += f"* [{html.escape(item[2])}] **{html.escape(item[0])}:** {html.escape(item[1])}\n"
     played_md = ""
     if played_list:
         for item in reversed(played_list):
-            played_md += f"* [{item[2]}] **{item[0]}:** {item[1]}\n"
+            played_md += f"* [{html.escape(item[2])}] **{html.escape(item[0])}:** {html.escape(item[1])}\n"
 
     return [
         gr.update(value=queue_md),
@@ -186,9 +187,9 @@ with gr.Blocks() as webui:
 
         with gr.Column():
             gr.Markdown("## Request queue:")
-            table = gr.Markdown()
+            table = gr.Markdown(sanitize_html=True)
             gr.Markdown("## Played:")
-            played = gr.Markdown()
+            played = gr.Markdown(sanitize_html=True)
 
             queue_timer = gr.Timer(2)
             timer = gr.Timer(2)
@@ -242,7 +243,7 @@ with gr.Blocks() as webui:
 app = gr.mount_gradio_app(app, webui, path="/", allowed_paths=["."])
 
 def launch_me():
-    uvicorn.run(app, host="0.0.0.0", port=7860, access_log=False)
+    uvicorn.run(app, host="0.0.0.0", port=7860, access_log=False, timeout_graceful_shutdown=2)
 
 if __name__ == "__main__":
     launch_me()
