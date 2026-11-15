@@ -143,6 +143,7 @@ function Start-TTS {
         return
     }
     Write-Host "Starting TTS..."
+    .\bin\pip.exe install -r tts/pre_requirements_versions.txt
     .\bin\python.exe -s tts/launch.py
     pause
 }
