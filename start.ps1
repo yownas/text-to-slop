@@ -96,7 +96,7 @@ function Install-Python {
         wheel `
         packaging `
         pygit2 `
-        setuptools==80.9.0 `
+        setuptools==84.2.1 `
         cffi==2.0.0
 
     Write-Host "Done..."
