@@ -60,41 +60,68 @@ def clone_voice(text):
 def select_voice(voice):
     tts.load_reference(voice)
 
+def select_language(lang):
+    tts.set_language(lang)
+
 # Webui...
 with gr.Blocks() as webui:
     with gr.Row():
-        with gr.Column(), gr.Group():
-            slop_voice = gr.Audio(
-                show_label = True,
-                label = "<>",
-                autoplay = True,
-            )
-            input_text = gr.Textbox(
-                show_label = False,
-                submit_btn = "Talk",
-            )
-            hidden_trigger = gr.Textbox(
-                visible = 'hidden',
-            )
-            reference_file = gr.Dropdown(
-                label = "Reference voice",
-                choices = reference_voices,
-                value = reference_voices[0],
-            )
-            max_length = gr.Slider(
-                label = "Max message length",
-                value = tts.get_max_len(),
-                minimum = 1,
-                maximum = 500,
-            )
-            max_length.change(fn=tts.set_max_len, inputs=max_length)
-            gr.Markdown("### Please keep this tab open.")
+        with gr.Column():
+            with gr.Group():
+                slop_voice = gr.Audio(
+                    show_label = True,
+                    label = "<>",
+                    autoplay = True,
+                )
+                input_text = gr.Textbox(
+                    show_label = False,
+                    submit_btn = "Talk",
+                )
+                hidden_trigger = gr.Textbox(
+                    visible = 'hidden',
+                )
+
+            with gr.Group():
+                reference_file = gr.Dropdown(
+                    label = "Reference voice",
+                    choices = reference_voices,
+                    value = reference_voices[0],
+                )
+                with gr.Row():
+                    max_length = gr.Slider(
+                        label = "Max message length",
+                        value = tts.get_max_len(),
+                        minimum = 1,
+                        maximum = 500,
+                    )
+                    max_length.change(fn=tts.set_max_len, inputs=max_length)
+                    language = gr.Dropdown(
+                        label = "Language",
+                        show_label = True,
+                        interactive = True,
+                        choices = [
+                            'Chinese',
+                            'English',
+                            'French',
+                            'German',
+                            'Italian',
+                            'Japanese',
+                            'Korean',
+                            'Portuguese',
+                            'Russian',
+                            'Spanish',
+                        ],
+                        value=tts.get_language(),
+                    )
+
+                gr.Markdown("### Please keep this tab open.")
 
         with gr.Column():
             gr.Markdown("### Incoming submissions at http://127.0.0.1:7860/submit?text=a+short+example+text")
             table = gr.Dataframe(
-                headers=["Time", "Text"],
-                interactive=False
+                headers = ["Time", "Text"],
+                interactive = False,
+                buttons = [],
             )
             timer = gr.Timer(2)
 
@@ -103,13 +130,14 @@ with gr.Blocks() as webui:
     input_text.submit(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
     hidden_trigger.change(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
     reference_file.select(fn=select_voice, inputs=reference_file)
+    language.select(fn=select_language, inputs=language)
 
 # Mount Gradio onto the FastAPI app AFTER the routes are defined.
 # allowed_paths moves here from launch().
 app = gr.mount_gradio_app(app, webui, path="/", allowed_paths=["."])
 
 def launch_me():
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    uvicorn.run(app, host="0.0.0.0", port=7860, log_level="warning")
 
 if __name__ == "__main__":
     launch_me()
