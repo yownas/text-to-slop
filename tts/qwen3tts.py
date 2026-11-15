@@ -12,7 +12,10 @@ class TTS():
         self.ref_vcp = None
         self.max_len = 200
         self.language = 'English'
-        self.model = Qwen3TTSModel.from_pretrained("models/Qwen3-TTS-12Hz-0.6B-Base")
+        self.model = Qwen3TTSModel.from_pretrained(
+            "models/Qwen3-TTS-12Hz-0.6B-Base",
+            device_map="cuda:0",
+        )
 
     def get_max_len(self):
         return self.max_len
@@ -25,6 +28,7 @@ class TTS():
 
     def set_language(self, language):
         self.language = language
+        self.load_reference(self.ref_audio) # Re-load reference voice
 
     def load_reference(self, sound):
         self.ref_audio = Path(os.getcwd()) / 'reference' / sound
@@ -40,6 +44,7 @@ class TTS():
         self.ref_vcp = self.model.create_voice_clone_prompt(
             ref_audio = str(self.ref_audio),
             ref_text = self.ref_text,
+            x_vector_only_mode=True,
         )
 
 
@@ -47,6 +52,7 @@ class TTS():
         wavs, sr = self.model.generate_voice_clone(
             voice_clone_prompt = self.ref_vcp,
             language = self.language,
-            text = text[:self.max_len]
+            text = text[:self.max_len],
+            x_vector_only_mode=True,
         )
         return (sr, wavs[0])

@@ -16,3 +16,9 @@ with the same name as the audio file, containing the phrase.
 Firebot example.
 
 `http://127.0.0.1:7860/submit?text=$encodeForUrl[$arg[all]]`
+
+# Usage
+
+* You *MUST* keep the browser tab open, or it won't play submitted texts.
+* The text-to-speech server can run on a separate computer but audio will be played via the browser.
+

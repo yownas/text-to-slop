@@ -23,6 +23,7 @@ tts = TTS()
 update_reference_voices()
 tts.load_reference(reference_voices[0])
 items = []                 # shared state
+max_items = 10
 
 # HTTP api...
 lock = threading.Lock()
@@ -32,12 +33,19 @@ app = FastAPI()
 def submit_get(
     text: str = Query(..., min_length=1),
 ):
-    global items
-    with lock:
-        items.append([datetime.now().strftime("%H:%M:%S"), text])
-        items = list(sorted(items))
-        count = len(items)
-    return {"ok": True, "count": count}
+    global items, max_items
+
+    if len(items) < max_items:
+        with lock:
+            items.append([datetime.now().strftime("%H:%M:%S"), text])
+            items = list(sorted(items))
+            ok_status = True
+            status = f"Place in queue: {len(items)}"
+    else:
+        ok_status = False
+        status = "Queue full"
+
+    return {"ok": ok_status, "status": status}
 
 def get_items(text, trigger):
     global items
@@ -53,10 +61,16 @@ def get_items(text, trigger):
             gr.update(value=trigger),
         ]
 
+def scrub_input(text):
+    text = text.strip()
+    return text
+
 def clone_voice(text):
+    text = scrub_input(text)
     snd = tts.clone_voice(text)
     return [
         gr.update(label=text, value=snd),
+        gr.update(),
         gr.update(value="")
     ]
 
@@ -79,25 +93,20 @@ with gr.Blocks() as webui:
                 input_text = gr.Textbox(
                     show_label = False,
                     submit_btn = "Talk",
+                    placeholder = "Enter text here...",
                 )
                 hidden_trigger = gr.Textbox(
                     visible = 'hidden',
                 )
 
             with gr.Group():
-                reference_file = gr.Dropdown(
-                    label = "Reference voice",
-                    choices = reference_voices,
-                    value = reference_voices[0],
-                )
                 with gr.Row():
-                    max_length = gr.Slider(
-                        label = "Max message length",
-                        value = tts.get_max_len(),
-                        minimum = 1,
-                        maximum = 500,
+                    reference_file = gr.Dropdown(
+                        label = "Reference voice",
+                        choices = reference_voices,
+                        value = reference_voices[0],
+                        scale = 4,
                     )
-                    max_length.change(fn=tts.set_max_len, inputs=max_length)
                     language = gr.Dropdown(
                         label = "Language",
                         show_label = True,
@@ -115,7 +124,17 @@ with gr.Blocks() as webui:
                             'Spanish',
                         ],
                         value=tts.get_language(),
+                        scale = 1,
                     )
+                with gr.Row():
+                    max_length = gr.Slider(
+                        label = "Max message length",
+                        value = tts.get_max_len(),
+                        minimum = 1,
+                        maximum = 500,
+                        scale = 3,
+                    )
+                    max_length.change(fn=tts.set_max_len, inputs=max_length)
 
                 gr.Markdown("### Please keep this tab open.")
 
@@ -127,11 +146,15 @@ with gr.Blocks() as webui:
                 buttons = [],
             )
             timer = gr.Timer(2)
+            played = gr.Dataframe(
+                headers = ['Text', '▶'],
+                buttons = [],
+            )
 
     timer.tick(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])
-    webui.load(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])         # fill on page load
-    input_text.submit(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
-    hidden_trigger.change(fn=clone_voice, inputs=input_text, outputs=[slop_voice, input_text])
+    webui.load(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger]) # fill on page load
+    input_text.submit(fn=clone_voice, inputs=input_text, outputs=[slop_voice, played, input_text])
+    hidden_trigger.change(fn=clone_voice, inputs=input_text, outputs=[slop_voice, played, input_text])
     reference_file.select(fn=select_voice, inputs=reference_file)
     language.select(fn=select_language, inputs=language)
 
