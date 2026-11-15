@@ -41,7 +41,8 @@ function Status-Bar {
     $got_python = Test-Path -Path "bin"
     $got_tts = Test-Path -Path "tts"
     $chars = [ordered]@{'True'='Installed';'False'='Not found'}
-    Write-Host "Python: $($chars["$got_python"]) | Text-To-Slop: $($chars["$got_tts"]) | https://github.com/yownas/text-to-slop"
+    Write-Host "Python: $($chars["$got_python"]) | Text-To-Slop: $($chars["$got_tts"])"
+    Write-Host "https://github.com/yownas/text-to-slop"
 }
 
 # Loop Python
