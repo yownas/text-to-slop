@@ -1,19 +1,25 @@
-from datetime import datetime
-from fastapi import FastAPI, Header, HTTPException, Query
+'''
+webui for text-to-slop - a silly locally run text-to-speech
+'''
+
+from tts.qwen3tts import TTS
+from fastapi import FastAPI, Query
 import gradio as gr
+from datetime import datetime
 import html
 import os
 from pathlib import Path
 import re
 import threading
-import time
-from tts.qwen3tts import TTS
 import uvicorn
 import warnings
 warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
 
 reference_voices = []
 def update_reference_voices():
+    '''
+    Check for audio files to use as refrence voices
+    '''
     global reference_voices
     files = []
     folder = Path(os.getcwd()) / "reference"
@@ -21,6 +27,7 @@ def update_reference_voices():
         files += Path(folder).glob(f"*.{ext}")
     reference_voices = sorted([Path(p).name for p in files])
     return gr.update(choices=reference_voices)
+
 tts = TTS()
 update_reference_voices()
 tts.load_reference(reference_voices[0])
@@ -34,6 +41,9 @@ lock = threading.Lock()
 app = FastAPI()
 
 def scrub_input(text):
+    '''
+    Some simple cleanup of the text string
+    '''
     text = text.strip()
     text = re.sub(r'\s+', ' ', text)
     return text
@@ -43,6 +53,7 @@ def submit_get(
     text: str = Query(..., min_length=1),
     user: str = Query(..., min_length=1),
 ):
+    """ Handle submissions via fastapi """
     global items, max_items
 
     text = scrub_input(text)
@@ -59,27 +70,37 @@ def submit_get(
         return {"ok": ok_status, "status": status}
 
 def update_queue():
+    """ Update webui """
     global items, played_list
     queue_md = ""
     if items:
         for item in items:
-            queue_md += f"* [{html.escape(item[2])}] **{html.escape(item[0])}:** {html.escape(item[1])}\n"
+            queue_md += "* [{time}] **{name}:** {text}\n".format(
+                name = html.escape(item[0]),
+                text = html.escape(item[1]),
+                time = html.escape(item[2]),
+            )
     played_md = ""
     if played_list:
         for item in reversed(played_list):
-            played_md += f"* [{html.escape(item[2])}] **{html.escape(item[0])}:** {html.escape(item[1])}\n"
+            played_md += "* [{time}] **{name}:** {text}\n".format(
+                name = html.escape(item[0]),
+                text = html.escape(item[1]),
+                time = html.escape(item[2]),
+            )
 
     return [
         gr.update(value=queue_md),
         gr.update(value=played_md),
     ]
 
-def get_items(user, text, trigger):
+def get_items(text):
+    """ Update webui with data """
     global items
     now = None
     with lock:
         top_item = None
-        if text == "" and len(items):
+        if text == "" and len(items) > 0:
             top_item = items.pop(0)
             now=datetime.now().strftime("%H:%M:%S")
 
@@ -90,6 +111,7 @@ def get_items(user, text, trigger):
         ]
 
 def clone_voice(user, text):
+    """ Generate sound clip """
     global played_list
     text = scrub_input(text)
     snd = tts.clone_voice(text)
@@ -104,9 +126,11 @@ def clone_voice(user, text):
         ]
 
 def select_voice(voice):
+    """ Handle voice selection """
     tts.load_reference(voice)
 
 def select_language(lang):
+    """ Handle language selection """
     tts.set_language(lang)
 
 # Webui...
@@ -202,13 +226,13 @@ with gr.Blocks() as webui:
     )
     timer.tick(
         fn=get_items,
-        inputs=[queue_name, queue_text, hidden_trigger],
+        inputs=[queue_text],
         outputs=[queue_name, queue_text, hidden_trigger]
     )
     # fill on page load
     webui.load(
         fn=get_items,
-        inputs=[queue_name, queue_text, hidden_trigger],
+        inputs=[queue_text],
         outputs=[queue_name, queue_text, hidden_trigger]
     )
     input_text.submit(
@@ -231,7 +255,7 @@ with gr.Blocks() as webui:
     )
     # Stop/start timer when audio is playing
     slop_voice.play(lambda: gr.Timer(active=False), outputs=timer)
-    for ev in (slop_voice.pause, slop_voice.stop, slop_voice.clear): 
+    for ev in (slop_voice.pause, slop_voice.stop, slop_voice.clear):
         ev(lambda: gr.Timer(active=True), outputs=timer)
     voice_reload.click(
         fn=update_reference_voices,
@@ -243,8 +267,8 @@ with gr.Blocks() as webui:
 app = gr.mount_gradio_app(app, webui, path="/", allowed_paths=["."])
 
 def launch_me():
+    """ Run TTS, run! """
     uvicorn.run(app, host="0.0.0.0", port=7860, access_log=False, timeout_graceful_shutdown=2)
 
 if __name__ == "__main__":
     launch_me()
-

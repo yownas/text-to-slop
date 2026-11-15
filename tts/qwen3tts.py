@@ -1,15 +1,16 @@
 from datetime import datetime
-import torch
 import os
 from pathlib import Path
-from slugify import slugify
+
 import soundfile as sf
 from sympy.logic.boolalg import BooleanAtom
 from qwen_tts import Qwen3TTSModel
+from slugify import slugify
 from transformers.utils import logging as hf_logging
 hf_logging.set_verbosity_error()
 
 class TTS():
+    """ Class for text-to-slop """
     def __init__(self):
         self.ref_audio = None
         self.ref_text = None
@@ -23,25 +24,32 @@ class TTS():
         )
 
     def get_max_len(self):
+        """ Get max length for text input """
         return self.max_len
 
     def set_max_len(self, max_len):
+        """ Set max length for text input """
         self.max_len = max_len
 
     def get_max_tokens(self):
+        """ Get max tokens for audio output """
         return self.max_tokens
 
     def set_max_tokens(self, max_tokens):
+        """ Set max tokens for audio output """
         self.max_tokens = max_tokens
 
     def get_language(self):
+        """ Get language """
         return self.language
 
     def set_language(self, language):
+        """ Set language """
         self.language = language
         self.load_reference(self.ref_audio) # Re-load reference voice
 
     def load_reference(self, sound):
+        """ Load reference sound file """
         self.ref_audio = Path(os.getcwd()) / 'reference' / sound
 
         txt_file = self.ref_audio.with_suffix('.txt')
@@ -59,6 +67,7 @@ class TTS():
         )
 
     def clone_voice(self, text):
+        """ Generate audio from text """
         wavs, sr = self.model.generate_voice_clone(
             voice_clone_prompt = self.ref_vcp,
             language = self.language,

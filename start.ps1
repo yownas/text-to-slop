@@ -91,7 +91,7 @@ function Install-Python {
     & "$Result\python.exe" "$Result\get-pip.py"
 
     # Install packages
-    & "$Result\Scripts\pip.exe" install `
+    & "$Result\Scripts\pip.exe" install --no-warn-script-location `
         wheel `
         packaging `
         pygit2 `
