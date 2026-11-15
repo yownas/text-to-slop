@@ -6,6 +6,7 @@ import soundfile as sf
 from sympy.logic.boolalg import BooleanAtom
 from qwen_tts import Qwen3TTSModel
 from slugify import slugify
+import torch
 from transformers.utils import logging as hf_logging
 hf_logging.set_verbosity_error()
 
@@ -18,9 +19,19 @@ class TTS():
         self.max_len = 200
         self.max_tokens = 500
         self.language = 'English'
+        self.device = "cpu"
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+        elif hasattr(torch, "xpu") and torch.xpu.is_available():
+            self.device = "xpu"
+        else:
+            self.device = "cpu"
+
         self.model = Qwen3TTSModel.from_pretrained(
             "models/Qwen3-TTS-12Hz-0.6B-Base",
-            device_map="cuda:0",
+            device_map=self.device,
         )
 
     def get_max_len(self):
