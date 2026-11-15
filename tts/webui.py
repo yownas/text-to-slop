@@ -179,6 +179,7 @@ with gr.Blocks() as webui:
 
 
                 gr.Markdown("### Please keep this tab open to keep JavaScript happy.")
+            gr.Markdown("https://github.com/yownas/text-to-slop")
 
         with gr.Column():
             gr.Markdown("## Request queue:")

@@ -15,7 +15,7 @@ class TTS():
         self.ref_text = None
         self.ref_vcp = None
         self.max_len = 200
-        self.max_tokens = 1000
+        self.max_tokens = 500
         self.language = 'English'
         self.model = Qwen3TTSModel.from_pretrained(
             "models/Qwen3-TTS-12Hz-0.6B-Base",
