@@ -53,8 +53,22 @@ def submit_get(
 
         return {"ok": ok_status, "status": status}
 
-def get_items(text, trigger):
+def update_queue():
     global items, played_list
+    queue_md = ""
+    for item in items:
+        queue_md += f"* {item[1]}: {item[0]}\n"
+    played_md = ""
+    for item in played_list.reversed():
+        played_md += f"* {item[0]} ({item[1]})\n"
+
+    return [
+        gr.update(value=queue_md),
+        gr.update(value=played_md),
+    ]
+
+def get_items(text, trigger):
+    global items
     now = None
     with lock:
         top_item = ""
@@ -63,8 +77,6 @@ def get_items(text, trigger):
             now=datetime.now().strftime("%H:%M:%S")
 
         return [
-            gr.update(value=items),
-            gr.update(value=played_list, label=now),
             gr.update() if top_item == "" else gr.update(value=top_item),
             gr.update() if now is None else gr.update(value=now),
         ]
@@ -155,38 +167,30 @@ with gr.Blocks() as webui:
                         max_tokens.change(fn=tts.set_max_tokens, inputs=max_tokens)
 
 
-                gr.Markdown("### Please keep this tab open.")
+                gr.Markdown("### Please keep this tab open to keep JavaScript happy.")
 
         with gr.Column():
-            gr.Markdown("### Incoming submissions at http://127.0.0.1:7860/submit?text=a+short+example+text")
-            table = gr.Dataframe(
-                headers = ['Text', 'Time'],
-                column_widths = ['75%', '25%'],
-                row_count = (1, "dynamic"),
-                interactive = False,
-                buttons = [],
-            )
-            played = gr.Dataframe(
-                label = "Played",
-                show_label = True,
-                headers = ['Text', 'File'],
-                column_widths = ['75%', '25%'],
-                row_count = (1, "dynamic"),
-                interactive = False,
-                buttons = [],
-            )
+            gr.Markdown("## Request queue:")
+            table = gr.Markdown()
+            gr.Markdown("## Played:")
+            played = gr.Markdown()
+            queue_timer = gr.Timer(2)
             timer = gr.Timer(2)
 
+    queue_timer.tick(
+        fn=update_queue,
+        outputs=[table, played],
+    )
     timer.tick(
         fn=get_items,
         inputs=[input_text, hidden_trigger],
-        outputs=[table, played, input_text, hidden_trigger]
+        outputs=[input_text, hidden_trigger]
     )
     # fill on page load
     webui.load(
         fn=get_items,
         inputs=[input_text, hidden_trigger],
-        outputs=[table, played, input_text, hidden_trigger]
+        outputs=[input_text, hidden_trigger]
     )
     input_text.submit(
         fn=clone_voice,
