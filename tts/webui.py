@@ -19,6 +19,7 @@ def update_reference_voices():
     for ext in ("mp3", "wav", "flac", "ogg"):
         files += Path(folder).glob(f"*.{ext}")
     reference_voices = sorted([Path(p).name for p in files])
+    return gr.update(choices=reference_voices)
 tts = TTS()
 update_reference_voices()
 tts.load_reference(reference_voices[0])
@@ -128,11 +129,13 @@ with gr.Blocks() as webui:
 
             with gr.Group():
                 with gr.Row():
+                    voice_reload = gr.Button(value="Reload")
                     reference_file = gr.Dropdown(
                         label = "Reference voice",
                         choices = reference_voices,
                         value = reference_voices[0],
                         scale = 4,
+                        buttons = [voice_reload],
                     )
                     language = gr.Dropdown(
                         label = "Language",
@@ -229,6 +232,10 @@ with gr.Blocks() as webui:
     slop_voice.play(lambda: gr.Timer(active=False), outputs=timer)
     for ev in (slop_voice.pause, slop_voice.stop, slop_voice.clear): 
         ev(lambda: gr.Timer(active=True), outputs=timer)
+    voice_reload.click(
+        fn=update_reference_voices,
+        outputs=[reference_file],
+    )
 
 # Mount Gradio onto the FastAPI app AFTER the routes are defined.
 # allowed_paths moves here from launch().
