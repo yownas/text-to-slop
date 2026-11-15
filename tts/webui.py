@@ -8,6 +8,9 @@ import time
 from tts.qwen3tts import TTS
 import uvicorn
 
+import warnings
+warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
+
 reference_voices = []
 def update_reference_voices():
     global reference_voices
@@ -137,7 +140,7 @@ with gr.Blocks() as webui:
 app = gr.mount_gradio_app(app, webui, path="/", allowed_paths=["."])
 
 def launch_me():
-    uvicorn.run(app, host="0.0.0.0", port=7860, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=7860, access_log=False)
 
 if __name__ == "__main__":
     launch_me()
