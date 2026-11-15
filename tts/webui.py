@@ -3,6 +3,7 @@ from fastapi import FastAPI, Header, HTTPException, Query
 import gradio as gr
 import os
 from pathlib import Path
+import re
 import threading
 import time
 from tts.qwen3tts import TTS
@@ -32,19 +33,21 @@ app = FastAPI()
 
 def scrub_input(text):
     text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
     return text
 
 @app.get("/submit")
 def submit_get(
     text: str = Query(..., min_length=1),
+    user: str = Query(..., min_length=1),
 ):
     global items, max_items
 
     text = scrub_input(text)
-    print(f"Request: {text}")
+    print(f"Request: {user}: {text}")
     with lock:
         if len(items) < max_items:
-            items.append([text, datetime.now().strftime("%H:%M:%S")])
+            items.append([user, text, datetime.now().strftime("%H:%M:%S")])
             ok_status = True
             status = f"Place in queue: {len(items)}"
         else:
@@ -56,39 +59,43 @@ def submit_get(
 def update_queue():
     global items, played_list
     queue_md = ""
-    for item in items:
-        queue_md += f"* {item[1]}: {item[0]}\n"
+    if items:
+        for item in items:
+            queue_md += f"* [{item[2]}] **{item[0]}:** {item[1]}\n"
     played_md = ""
-    for item in played_list.reversed():
-        played_md += f"* {item[0]} ({item[1]})\n"
+    if played_list:
+        for item in reversed(played_list):
+            played_md += f"* [{item[2]}] **{item[0]}:** {item[1]}\n"
 
     return [
         gr.update(value=queue_md),
         gr.update(value=played_md),
     ]
 
-def get_items(text, trigger):
+def get_items(user, text, trigger):
     global items
     now = None
     with lock:
-        top_item = ""
+        top_item = None
         if text == "" and len(items):
-            top_item = items.pop(0)[0]
+            top_item = items.pop(0)
             now=datetime.now().strftime("%H:%M:%S")
 
         return [
-            gr.update() if top_item == "" else gr.update(value=top_item),
+            gr.update() if top_item is None else gr.update(value=top_item[0]), # User
+            gr.update() if top_item is None else gr.update(value=top_item[1]), # Text
             gr.update() if now is None else gr.update(value=now),
         ]
 
-def clone_voice(text):
+def clone_voice(user, text):
     global played_list
     text = scrub_input(text)
     snd = tts.clone_voice(text)
     output = Path(os.getcwd()) / 'output'
     path = str(output / snd)
     with lock:
-        played_list.append([text, snd])
+        now = datetime.now().strftime("%H:%M:%S")
+        played_list.append([user, text, now, snd])
         return [
             gr.update(label=text, value=path),
             gr.update(value="")
@@ -151,18 +158,22 @@ with gr.Blocks() as webui:
                             label = "AI settings",
                             open = False
                         ):
+                        admin_name = gr.Textbox(
+                            label = "Webui user-name",
+                            value = "Admin",
+                        )
                         max_length = gr.Slider(
-                            label = "Max message length",
+                            label = "Max message length (characters)",
                             value = tts.get_max_len(),
                             minimum = 1,
                             maximum = 500,
                         )
                         max_length.change(fn=tts.set_max_len, inputs=max_length)
                         max_tokens = gr.Slider(
-                            label = "Max tokens",
+                            label = "Max tokens (~10 tokens per second of audio)",
                             value = tts.get_max_tokens(),
                             minimum = 1,
-                            maximum = 3000,
+                            maximum = 1500,
                         )
                         max_tokens.change(fn=tts.set_max_tokens, inputs=max_tokens)
 
@@ -174,8 +185,11 @@ with gr.Blocks() as webui:
             table = gr.Markdown()
             gr.Markdown("## Played:")
             played = gr.Markdown()
+
             queue_timer = gr.Timer(2)
             timer = gr.Timer(2)
+            queue_name = gr.State("")
+            queue_text = gr.State("")
 
     queue_timer.tick(
         fn=update_queue,
@@ -183,24 +197,24 @@ with gr.Blocks() as webui:
     )
     timer.tick(
         fn=get_items,
-        inputs=[input_text, hidden_trigger],
-        outputs=[input_text, hidden_trigger]
+        inputs=[queue_name, queue_text, hidden_trigger],
+        outputs=[queue_name, queue_text, hidden_trigger]
     )
     # fill on page load
     webui.load(
         fn=get_items,
-        inputs=[input_text, hidden_trigger],
-        outputs=[input_text, hidden_trigger]
+        inputs=[queue_name, queue_text, hidden_trigger],
+        outputs=[queue_name, queue_text, hidden_trigger]
     )
     input_text.submit(
         fn=clone_voice,
-        inputs=input_text,
+        inputs=[admin_name, input_text],
         outputs=[slop_voice, input_text]
     )
     hidden_trigger.change(
         fn=clone_voice,
-        inputs=input_text,
-        outputs=[slop_voice, input_text]
+        inputs=[queue_name, queue_text],
+        outputs=[slop_voice, queue_text]
     )
     reference_file.select(
         fn=select_voice,

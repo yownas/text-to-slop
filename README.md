@@ -15,7 +15,7 @@ with the same name as the audio file, containing the phrase.
 
 Firebot example.
 
-`http://127.0.0.1:7860/submit?text=$encodeForUrl[$arg[all]]`
+`http://127.0.0.1:7860/submit?user=$user&text=$encodeForUrl[$arg[all]]`
 
 # Usage
 
