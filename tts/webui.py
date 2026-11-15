@@ -7,7 +7,6 @@ import threading
 import time
 from tts.qwen3tts import TTS
 import uvicorn
-
 import warnings
 warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
 
@@ -26,11 +25,15 @@ tts.load_reference(reference_voices[0])
 items = []                 # shared state
 max_items = 10
 
-played_items = []
+played_list = []
 
 # HTTP api...
 lock = threading.Lock()
 app = FastAPI()
+
+def scrub_input(text):
+    text = text.strip()
+    return text
 
 @app.get("/submit")
 def submit_get(
@@ -38,6 +41,8 @@ def submit_get(
 ):
     global items, max_items
 
+    text = scrub_input(text)
+    print(f"Request: {text}")
     with lock:
         if len(items) < max_items:
             items.append([text, datetime.now().strftime("%H:%M:%S")])
@@ -50,7 +55,7 @@ def submit_get(
         return {"ok": ok_status, "status": status}
 
 def get_items(text, trigger):
-    global items, played_items
+    global items, played_list
     now = None
     with lock:
         top_item = ""
@@ -58,26 +63,25 @@ def get_items(text, trigger):
             top_item = items.pop(0)[0]
             now=datetime.now().strftime("%H:%M:%S")
 
+        print(f"DEBUG: {items} - {played_list}")
+
         return [
             gr.update(value=items),
-            gr.update(value=played_items),
+            gr.update(value=played_list, label=now),
             gr.update() if top_item == "" else gr.update(value=top_item),
             gr.update() if now is None else gr.update(value=now),
         ]
 
-def scrub_input(text):
-    text = text.strip()
-    return text
-
 def clone_voice(text):
-    global played_items
+    global played_list
     text = scrub_input(text)
     snd = tts.clone_voice(text)
-    # TODO save snd as file
+    output = Path(os.getcwd()) / 'output'
+    path = str(output / snd)
     with lock:
-        played_items.append([text, "file"])
+        played_list.append([text, snd])
         return [
-            gr.update(label=text, value=snd),
+            gr.update(label=text, value=path),
             gr.update(value="")
         ]
 
@@ -134,14 +138,25 @@ with gr.Blocks() as webui:
                         scale = 1,
                     )
                 with gr.Row():
-                    max_length = gr.Slider(
-                        label = "Max message length",
-                        value = tts.get_max_len(),
-                        minimum = 1,
-                        maximum = 500,
-                        scale = 3,
-                    )
-                    max_length.change(fn=tts.set_max_len, inputs=max_length)
+                    with gr.Accordion(
+                            label = "AI settings",
+                            open = False
+                        ):
+                        max_length = gr.Slider(
+                            label = "Max message length",
+                            value = tts.get_max_len(),
+                            minimum = 1,
+                            maximum = 500,
+                        )
+                        max_length.change(fn=tts.set_max_len, inputs=max_length)
+                        max_tokens = gr.Slider(
+                            label = "Max tokens",
+                            value = tts.get_max_tokens(),
+                            minimum = 1,
+                            maximum = 3000,
+                        )
+                        max_tokens.change(fn=tts.set_max_tokens, inputs=max_tokens)
+
 
                 gr.Markdown("### Please keep this tab open.")
 
@@ -150,16 +165,20 @@ with gr.Blocks() as webui:
             table = gr.Dataframe(
                 headers = ['Text', 'Time'],
                 column_widths = ['75%', '25%'],
+                row_count = (1, "dynamic"),
+                interactive = False,
+                buttons = [],
+            )
+            played = gr.Dataframe(
+                label = "Played",
+                show_label = True,
+                headers = ['Text', 'File'],
+                column_widths = ['75%', '25%'],
+                row_count = (1, "dynamic"),
                 interactive = False,
                 buttons = [],
             )
             timer = gr.Timer(2)
-            played = gr.Dataframe(
-                headers = ['Text', 'File'],
-                column_widths = ['75%', '25%'],
-                interactive = False,
-                buttons = [],
-            )
 
     timer.tick(
         fn=get_items,
