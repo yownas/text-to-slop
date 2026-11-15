@@ -22,8 +22,11 @@ def update_reference_voices():
 tts = TTS()
 update_reference_voices()
 tts.load_reference(reference_voices[0])
+
 items = []                 # shared state
 max_items = 10
+
+played_items = []
 
 # HTTP api...
 lock = threading.Lock()
@@ -35,30 +38,31 @@ def submit_get(
 ):
     global items, max_items
 
-    if len(items) < max_items:
-        with lock:
-            items.append([datetime.now().strftime("%H:%M:%S"), text])
-            items = list(sorted(items))
+    with lock:
+        if len(items) < max_items:
+            items.append([text, datetime.now().strftime("%H:%M:%S")])
             ok_status = True
             status = f"Place in queue: {len(items)}"
-    else:
-        ok_status = False
-        status = "Queue full"
+        else:
+            ok_status = False
+            status = "Queue full"
 
-    return {"ok": ok_status, "status": status}
+        return {"ok": ok_status, "status": status}
 
 def get_items(text, trigger):
-    global items
+    global items, played_items
+    now = None
     with lock:
         top_item = ""
         if text == "" and len(items):
-            top_item = items.pop()[1]
-            trigger=datetime.now().strftime("%H:%M:%S")
+            top_item = items.pop(0)[0]
+            now=datetime.now().strftime("%H:%M:%S")
 
         return [
             gr.update(value=items),
+            gr.update(value=played_items),
             gr.update() if top_item == "" else gr.update(value=top_item),
-            gr.update(value=trigger),
+            gr.update() if now is None else gr.update(value=now),
         ]
 
 def scrub_input(text):
@@ -66,13 +70,16 @@ def scrub_input(text):
     return text
 
 def clone_voice(text):
+    global played_items
     text = scrub_input(text)
     snd = tts.clone_voice(text)
-    return [
-        gr.update(label=text, value=snd),
-        gr.update(),
-        gr.update(value="")
-    ]
+    # TODO save snd as file
+    with lock:
+        played_items.append([text, "file"])
+        return [
+            gr.update(label=text, value=snd),
+            gr.update(value="")
+        ]
 
 def select_voice(voice):
     tts.load_reference(voice)
@@ -141,22 +148,48 @@ with gr.Blocks() as webui:
         with gr.Column():
             gr.Markdown("### Incoming submissions at http://127.0.0.1:7860/submit?text=a+short+example+text")
             table = gr.Dataframe(
-                headers = ["Time", "Text"],
+                headers = ['Text', 'Time'],
+                column_widths = ['75%', '25%'],
                 interactive = False,
                 buttons = [],
             )
             timer = gr.Timer(2)
             played = gr.Dataframe(
-                headers = ['Text', '▶'],
+                headers = ['Text', 'File'],
+                column_widths = ['75%', '25%'],
+                interactive = False,
                 buttons = [],
             )
 
-    timer.tick(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger])
-    webui.load(get_items, inputs=[input_text, hidden_trigger], outputs=[table, input_text, hidden_trigger]) # fill on page load
-    input_text.submit(fn=clone_voice, inputs=input_text, outputs=[slop_voice, played, input_text])
-    hidden_trigger.change(fn=clone_voice, inputs=input_text, outputs=[slop_voice, played, input_text])
-    reference_file.select(fn=select_voice, inputs=reference_file)
-    language.select(fn=select_language, inputs=language)
+    timer.tick(
+        fn=get_items,
+        inputs=[input_text, hidden_trigger],
+        outputs=[table, played, input_text, hidden_trigger]
+    )
+    # fill on page load
+    webui.load(
+        fn=get_items,
+        inputs=[input_text, hidden_trigger],
+        outputs=[table, played, input_text, hidden_trigger]
+    )
+    input_text.submit(
+        fn=clone_voice,
+        inputs=input_text,
+        outputs=[slop_voice, input_text]
+    )
+    hidden_trigger.change(
+        fn=clone_voice,
+        inputs=input_text,
+        outputs=[slop_voice, input_text]
+    )
+    reference_file.select(
+        fn=select_voice,
+        inputs=reference_file
+    )
+    language.select(
+        fn=select_language,
+        inputs=language
+    )
 
 # Mount Gradio onto the FastAPI app AFTER the routes are defined.
 # allowed_paths moves here from launch().
