@@ -24,7 +24,6 @@ tts.load_reference(reference_voices[0])
 
 items = []                 # shared state
 max_items = 10
-
 played_list = []
 
 # HTTP api...
@@ -62,8 +61,6 @@ def get_items(text, trigger):
         if text == "" and len(items):
             top_item = items.pop(0)[0]
             now=datetime.now().strftime("%H:%M:%S")
-
-        print(f"DEBUG: {items} - {played_list}")
 
         return [
             gr.update(value=items),
@@ -209,6 +206,10 @@ with gr.Blocks() as webui:
         fn=select_language,
         inputs=language
     )
+    # Stop/start timer when audio is playing
+    slop_voice.play(lambda: gr.Timer(active=False), outputs=timer)
+    for ev in (slop_voice.pause, slop_voice.stop, slop_voice.clear): 
+        ev(lambda: gr.Timer(active=True), outputs=timer)
 
 # Mount Gradio onto the FastAPI app AFTER the routes are defined.
 # allowed_paths moves here from launch().

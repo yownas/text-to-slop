@@ -66,8 +66,8 @@ class TTS():
             non_streaming_mode = True,
         )
         output = Path(os.getcwd()) / 'output'
-        filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}"
-        path = str(output / f"{slugify(filename)}.mp3")
+        filename = slugify(f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}") + ".mp3"
+        path = str(output / filename)
         sf.write(path, wavs[0], sr, format="MP3")
 
         return filename
