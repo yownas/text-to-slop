@@ -4,6 +4,7 @@ webui for text-to-slop - a silly locally run text-to-speech
 
 from tts.qwen3tts import TTS
 from fastapi import FastAPI, Query
+from fastapi.responses import FileResponse
 import gradio as gr
 from datetime import datetime
 import html
@@ -69,6 +70,23 @@ def submit_get(
 
         return {"ok": ok_status, "status": status}
 
+@app.get("/sound")
+def sound_get(
+    text: str = Query(..., min_length=1),
+    user: str = Query(..., min_length=1),
+):
+    """ Get sound file directly via fastapi """
+    global played_list
+
+    text = scrub_input(text)
+    print(f"Sound_get: {user}: {text}")
+    path = clone_voice(user, text, return_file=True)
+
+    return FileResponse(
+        path=str(path),
+        media_type="audio/mpeg",
+    )
+
 def update_queue():
     """ Update webui """
     global items, played_list
@@ -110,7 +128,7 @@ def get_items(text):
             gr.update() if now is None else gr.update(value=now),
         ]
 
-def clone_voice(user, text):
+def clone_voice(user, text, return_file=False):
     """ Generate sound clip """
     global played_list
     text = scrub_input(text)
@@ -120,10 +138,13 @@ def clone_voice(user, text):
     with lock:
         now = datetime.now().strftime("%H:%M:%S")
         played_list.append([user, text, now, snd])
-        return [
-            gr.update(label=text, value=path),
-            gr.update(value="")
-        ]
+        if return_file:
+            return(path)
+        else:
+            return [
+                gr.update(label=text, value=path),
+                gr.update(value="")
+            ]
 
 def select_voice(voice):
     """ Handle voice selection """

@@ -1,6 +1,8 @@
 from datetime import datetime
+from hashlib import sha256
 import os
 from pathlib import Path
+import threading
 
 import soundfile as sf
 from sympy.logic.boolalg import BooleanAtom
@@ -20,6 +22,8 @@ class TTS():
         self.max_tokens = 500
         self.language = 'English'
         self.device = "cpu"
+        self.cache = {}
+        self.cache_lock = threading.Lock()
         if torch.cuda.is_available():
             self.device = "cuda"
         elif torch.backends.mps.is_available():
@@ -79,17 +83,25 @@ class TTS():
 
     def clone_voice(self, text):
         """ Generate audio from text """
-        wavs, sr = self.model.generate_voice_clone(
-            voice_clone_prompt = self.ref_vcp,
-            language = self.language,
-            text = text[:self.max_len],
-            x_vector_only_mode = True,
-            max_new_tokens = self.max_tokens,
-            non_streaming_mode = True,
-        )
-        output = Path(os.getcwd()) / 'output'
-        filename = slugify(f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}") + ".mp3"
-        path = str(output / filename)
-        sf.write(path, wavs[0], sr, format="MP3")
-
+        with self.cache_lock:
+            filehash = sha256(
+                f"{slugify(text)}|{self.ref_audio}|{self.language}"
+                .encode('utf-8')
+            ).hexdigest()
+            if filehash in self.cache:
+                filename = self.cache[filehash]
+            else:
+                wavs, sr = self.model.generate_voice_clone(
+                    voice_clone_prompt = self.ref_vcp,
+                    language = self.language,
+                    text = text[:self.max_len],
+                    x_vector_only_mode = True,
+                    max_new_tokens = self.max_tokens,
+                    non_streaming_mode = True,
+                )
+                output = Path(os.getcwd()) / 'output'
+                filename = slugify(f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}") + ".mp3"
+                path = str(output / filename)
+                sf.write(path, wavs[0], sr, format="MP3")
+                self.cache[filehash] = path
         return filename

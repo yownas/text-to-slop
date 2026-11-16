@@ -17,9 +17,13 @@ or create a `.txt` file with the same name as the audio file, containing the tra
 
 Firebot example.
 
+### Play sound in the webui
+
 `http://127.0.0.1:7860/submit?user=$encodeForUrl[$user]&text=$encodeForUrl[$arg[all]]`
 
-Method: GET
+### Retrieve the soundclip to play it in Firebot
+
+`http://127.0.0.1:7860/sound?user=$user&text=$encodeForUrl[$chatMessage]` 
 
 # Usage
 
