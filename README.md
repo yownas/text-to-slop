@@ -19,11 +19,12 @@ Firebot example.
 
 ### Play sound in the webui
 
-`http://127.0.0.1:7860/submit?user=$encodeForUrl[$user]&text=$encodeForUrl[$arg[all]]`
+`http://127.0.0.1:7860/submit?user=$encodeForUrl[$user]&text=$encodeForUrl[$arg[all]]&rnd=$randomUUID`
 
 ### Retrieve the soundclip to play it in Firebot
 
-`http://127.0.0.1:7860/sound?user=$user&text=$encodeForUrl[$chatMessage]` 
+`http://127.0.0.1:7860/sound?user=$user&text=$encodeForUrl[$chatMessage]&rnd=$randomUUID`
+
 
 # Usage
 

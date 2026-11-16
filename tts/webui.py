@@ -58,7 +58,6 @@ def submit_get(
     global items, max_items
 
     text = scrub_input(text)
-    print(f"Request: {user}: {text}")
     with lock:
         if len(items) < max_items:
             items.append([user, text, datetime.now().strftime("%H:%M:%S")])
@@ -79,7 +78,6 @@ def sound_get(
     global played_list
 
     text = scrub_input(text)
-    print(f"Sound_get: {user}: {text}")
     path = clone_voice(user, text, return_file=True)
 
     return FileResponse(
@@ -132,7 +130,7 @@ def clone_voice(user, text, return_file=False):
     """ Generate sound clip """
     global played_list
     text = scrub_input(text)
-    snd = tts.clone_voice(text)
+    snd = tts.clone_voice(text, user=user)
     output = Path(os.getcwd()) / 'output'
     path = str(output / snd)
     with lock:

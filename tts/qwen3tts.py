@@ -81,7 +81,7 @@ class TTS():
             x_vector_only_mode = True,
         )
 
-    def clone_voice(self, text):
+    def clone_voice(self, text, user="Anonymous"):
         """ Generate audio from text """
         with self.cache_lock:
             filehash = sha256(
@@ -91,6 +91,7 @@ class TTS():
             if filehash in self.cache:
                 filename = self.cache[filehash]
             else:
+                print(f"Generating: {user}: {text[:self.max_len]}")
                 wavs, sr = self.model.generate_voice_clone(
                     voice_clone_prompt = self.ref_vcp,
                     language = self.language,
