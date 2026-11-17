@@ -9,7 +9,7 @@ If it fails you might need to open up PowerShell and run `Set-ExecutionPolicy Un
 which hopefully will allow you to run it. (I hate Windows)
 Select python. Download TTS. Run.
 
-Place a ~3-5 second audio clip in the `reference` folder. You also need to provide the transcript of what is spoken.
+Place a 3-15 second audio clip in the `reference` folder. You also need to provide the transcript of what is spoken.
 You can either name the file audio file with the phrase in its name `I_cant_run_through_the_mud_in_my_pretty_party_dress.mp3`
 or create a `.txt` file with the same name as the audio file, containing the transcript.
 

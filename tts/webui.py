@@ -130,6 +130,11 @@ def clone_voice(user, text, return_file=False):
     """ Generate sound clip """
     global played_list
     text = scrub_input(text)
+    if len(text) <= 0:
+        return [
+            gr.update(),
+            gr.update()
+        ]
     snd = tts.clone_voice(text, user=user)
     output = Path(os.getcwd()) / 'output'
     path = str(output / snd)
@@ -213,17 +218,43 @@ with gr.Blocks() as webui:
                             label = "Max message length (characters)",
                             value = tts.get_max_len(),
                             minimum = 1,
-                            maximum = 500,
+                            maximum = 1000,
                         )
                         max_length.change(fn=tts.set_max_len, inputs=max_length)
                         max_tokens = gr.Slider(
                             label = "Max tokens (~10 tokens per second of audio)",
                             value = tts.get_max_tokens(),
                             minimum = 1,
-                            maximum = 1500,
+                            maximum = 2000,
                         )
                         max_tokens.change(fn=tts.set_max_tokens, inputs=max_tokens)
 
+                        tts_temperature = gr.Slider(
+                            label = "Temperature: Expressiveness (robotic -> natural)",
+                            value = tts.get_tts_temperature(),
+                            minimum = 0.01,
+                            maximum = 2.0,
+                            step = 0.01
+                        )
+                        tts_temperature.change(fn=tts.set_tts_temperature, inputs=tts_temperature)
+
+                        tts_top_k = gr.Slider(
+                            label = "top_k: Variety",
+                            value = tts.get_tts_top_k(),
+                            minimum = 1,
+                            maximum = 3072,
+                            step = 1
+                        )
+                        tts_top_k.change(fn=tts.set_tts_top_k, inputs=tts_top_k)
+
+                        tts_top_p = gr.Slider(
+                            label = "top_p: Precision",
+                            value = tts.get_tts_top_p(),
+                            minimum = 0.0,
+                            maximum = 1.0,
+                            step = 0.01
+                        )
+                        tts_top_p.change(fn=tts.set_tts_top_p, inputs=tts_top_p)
 
                 gr.Markdown("### Please keep this tab open to keep JavaScript happy.")
             gr.Markdown("https://github.com/yownas/text-to-slop")
