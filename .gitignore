@@ -1,5 +1,6 @@
 bin
 data/dl
 output/*.mp3
+reference/*
 __pycache__
 models/*
