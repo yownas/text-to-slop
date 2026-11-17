@@ -15,6 +15,7 @@ import threading
 import uvicorn
 import warnings
 warnings.filterwarnings("ignore", message=".*HTTP_422_UNPROCESSABLE_ENTITY.*")
+import __main__
 
 reference_voices = []
 def update_reference_voices():
@@ -23,7 +24,7 @@ def update_reference_voices():
     '''
     global reference_voices
     files = []
-    folder = Path(os.getcwd()) / "reference"
+    folder = Path(__main__.__file__).resolve().parent  / 'reference'
     for ext in ("mp3", "wav", "flac", "ogg"):
         files += Path(folder).glob(f"*.{ext}")
     reference_voices = sorted([Path(p).name for p in files])

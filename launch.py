@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import __main__
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def run(command, desc=None, errdesc=None) -> str:
 def prepare_env():
     print(f"Python {sys.version}")
 
-    requirements_file = "pre_requirements_versions.txt"
+    requirements_file = Path(__main__.__file__).resolve().parent / "pre_requirements_versions.txt"
 
     run(
         f'"{sys.executable}" -m pip install --upgrade pip',
@@ -54,7 +55,7 @@ def prepare_env():
     )
 
 def prepare_modules():
-    requirements_file = "requirements_versions.txt"
+    requirements_file = Path(__main__.__file__).resolve().parent / "requirements_versions.txt"
     run(
         f'"{sys.executable}" -m pip install --no-warn-script-location --no-build-isolation -r "{requirements_file}"',
         "Check requirements",
@@ -84,7 +85,7 @@ def download_models():
         ),
     ]
     for repo, local_dir in model_repos:
-        path = Path(__file__).resolve().parent / 'models' / local_dir
+        path = Path(__main__.__file__).resolve().parent / 'models' / local_dir
         print(f"Download {repo}")
         snapshot_download(repo_id=repo, local_dir=path)
 

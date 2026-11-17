@@ -2,6 +2,7 @@ from datetime import datetime
 from hashlib import sha256
 import os
 from pathlib import Path
+import re
 import threading
 
 import soundfile as sf
@@ -12,9 +13,26 @@ from slugify import slugify
 import torch
 from transformers.utils import logging as hf_logging
 hf_logging.set_verbosity_error()
+import __main__
 
 class TTS():
     """ Class for text-to-slop """
+    def get_mod_re_pattern(self):
+        folder = Path(__main__.__file__).resolve().parent / 'config' / 'blocklists'
+
+        blocked = set()
+        for ext in ("txt"):
+            for file in Path(folder).glob(f"*.{ext}"):
+                with open(file, 'r', encoding='utf-8') as blocklist:
+                    for line in blocklist:
+                        blocked.add(line.strip())
+
+        pattern = re.compile(
+            r"(?<!\w)(?:" + "|".join(map(re.escape, sorted(list(blocked), key=len, reverse=True))) + r")(?!\w)",
+            re.IGNORECASE,
+        )
+        return pattern
+
     def __init__(self):
         self.ref_audio = None
         self.ref_text = None
@@ -38,15 +56,15 @@ class TTS():
             self.device = "cpu"
 
         self.model = Qwen3TTSModel.from_pretrained(
-            "models/Qwen3-TTS-12Hz-0.6B-Base",
+            Path(__main__.__file__).resolve().parent / 'models' / 'Qwen3-TTS-12Hz-0.6B-Base',
             device_map=self.device,
         )
         self.mod_model = AutoModelForSequenceClassification.from_pretrained(
-            "models/vrandan-comment-moderation",
+            Path(__main__.__file__).resolve().parent / 'models' / 'vrandan-comment-moderation',
             device_map="cpu",
         )
         self.mod_tokenizer = AutoTokenizer.from_pretrained(
-            "models/vrandan-comment-moderation",
+            Path(__main__.__file__).resolve().parent / 'models' / 'vrandan-comment-moderation',
             device_map="cpu",
         )
         self.mod_enabled = True
@@ -75,6 +93,7 @@ class TTS():
             "H2": "Hate/Threat",
         }
         self.mod_meaning_labels = {v: k for k, v in self.mod_label_meanings.items()} # Reverse lookup
+        self.mod_re_pattern = self.get_mod_re_pattern()
 
     # get/set functions
     def get_max_len(self): return self.max_len
@@ -100,7 +119,7 @@ class TTS():
 
     def load_reference(self, sound):
         """ Load reference sound file """
-        self.ref_audio = Path(os.getcwd()) / 'reference' / sound
+        self.ref_audio = Path(__main__.__file__).resolve().parent / 'reference' / sound
 
         txt_file = self.ref_audio.with_suffix('.txt')
         if txt_file.exists():
@@ -131,6 +150,13 @@ class TTS():
             # If moderations isn't enabled, just allow anything
             return True
 
+        if verbose: print(f"\nModeration: Check: {text}")
+
+        if self.mod_re_pattern.search(text) is not None:
+            if verbose: print(f"BLOCKED by word list!")
+            return False
+
+        # Use classifier
         inputs = self.mod_tokenizer(text, return_tensors="pt")
         outputs = self.mod_model(**inputs)
         probabilities = outputs.logits.softmax(dim=-1).squeeze()
@@ -139,7 +165,6 @@ class TTS():
         labels = [self.mod_model.config.id2label[i] for i in range(len(probabilities))]
         predictions = dict(zip(labels, probabilities.detach().tolist()))
 
-        if verbose: print(f"\nModeration: Check: {text}")
         pass_mod = True
         for key in self.mod_labels.keys():
             status = predictions.get(key, 0.0) <= self.mod_labels[key]
@@ -172,7 +197,7 @@ class TTS():
                         top_k = int(self.tts_top_k), # 1 - 3072, def 50 
                         top_p = float(self.tts_top_p), # 0.0 - 1.0, def 1.0 
                     )
-                    output = Path(os.getcwd()) / 'output'
+                    output = Path(__main__.__file__).resolve().parent / 'output'
                     filename = slugify(f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}") + ".mp3"
                     filename = str(output / filename)
                     sf.write(filename, wavs[0], sr, format="MP3")
