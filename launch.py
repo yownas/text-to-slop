@@ -78,8 +78,11 @@ def download_models():
 #            "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
 #            "./Qwen3-TTS-12Hz-1.7B-Base",
 #        ),
+        (
+            "Vrandan/Comment-Moderation",
+            "./vrandan-comment-moderation",
+        ),
     ]
-
     for repo, local_dir in model_repos:
         path = Path(__file__).resolve().parent / 'models' / local_dir
         print(f"Download {repo}")

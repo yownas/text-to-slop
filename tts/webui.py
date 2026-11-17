@@ -135,27 +135,27 @@ def clone_voice(user, text, return_file=False):
             gr.update(),
             gr.update()
         ]
-    snd = tts.clone_voice(text, user=user)
-    output = Path(os.getcwd()) / 'output'
-    path = str(output / snd)
+    path = tts.clone_voice(text, user=user)
     with lock:
         now = datetime.now().strftime("%H:%M:%S")
-        played_list.append([user, text, now, snd])
+        played_list.append([user, ("**BLOCKED** " if path is None else "") + text, now, path])
         if return_file:
             return(path)
         else:
-            return [
-                gr.update(label=text, value=path),
-                gr.update(value="")
-            ]
+            if path is None:
+                gr.Warning(f"{user} sent a message that was blocked!")
+                return [
+                    gr.update(),
+                    gr.update(value="")
+                ]
+            else:
+                return [
+                    gr.update(label=text, value=path),
+                    gr.update(value="")
+                ]
 
-def select_voice(voice):
-    """ Handle voice selection """
-    tts.load_reference(voice)
-
-def select_language(lang):
-    """ Handle language selection """
-    tts.set_language(lang)
+def select_voice(voice): tts.load_reference(voice)
+def select_language(lang): tts.set_language(lang)
 
 # Webui...
 with gr.Blocks() as webui:
@@ -255,6 +255,32 @@ with gr.Blocks() as webui:
                             step = 0.01
                         )
                         tts_top_p.change(fn=tts.set_tts_top_p, inputs=tts_top_p)
+                with gr.Row():
+                    with gr.Accordion(
+                            label = "Moderation",
+                            open = False
+                        ):
+                        with gr.Row():
+                            tts_mod_enabled = gr.Checkbox(label = "Enabled", value = tts.mod_enabled)
+                            tts_mod_enabled.change(fn=tts.set_mod_enabled, inputs=tts_mod_enabled)
+                            tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose)
+                            tts_mod_verbose.change(fn=tts.set_mod_verbose, inputs=tts_mod_verbose)
+
+                        def update_tts_mod_value(value, evt: gr.EventData):
+                            label = tts.mod_meaning_labels.get(evt.target.label, None)
+                            if label is not None:
+                                tts.mod_labels[label] = value
+                        with gr.Group():
+                            mod_slider = {}
+                            for label in ['H', 'SH', 'V', 'S', 'HR', 'V2', 'S3', 'H2']:
+                                mod_slider[label] = gr.Slider(
+                                    label=tts.mod_label_meanings[label],
+                                    value=tts.mod_labels[label],
+                                    minimum=-1.0 if tts.mod_allow_negative else 0.0,
+                                    maximum=1.0,
+                                    step=0.01,
+                                )
+                                mod_slider[label].change(fn=update_tts_mod_value, inputs=mod_slider[label])
 
                 gr.Markdown("### Please keep this tab open to keep JavaScript happy.")
             gr.Markdown("https://github.com/yownas/text-to-slop")
