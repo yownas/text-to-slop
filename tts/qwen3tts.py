@@ -1,5 +1,6 @@
 from datetime import datetime
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
@@ -19,13 +20,15 @@ class TTS():
     """ Class for text-to-slop """
     def get_mod_re_pattern(self):
         folder = Path(__main__.__file__).resolve().parent / 'config' / 'blocklists'
-
         blocked = set()
         for ext in ("txt",):
             for file in Path(folder).glob(f"*.{ext}"):
-                with open(file, 'r', encoding='utf-8') as blocklist:
-                    for line in blocklist:
-                        blocked.add(line.strip())
+                try:
+                    with open(file, 'r', encoding='utf-8') as blocklist:
+                        for line in blocklist:
+                            blocked.add(line.strip())
+                except:
+                    pass
 
         if len(blocked) > 0:
             pattern = re.compile(
@@ -36,16 +39,81 @@ class TTS():
             pattern = None
         return pattern
 
+    def get_mod_banned_users(self):
+        folder = Path(__main__.__file__).resolve().parent / 'config' / 'userbans'
+        banned = set()
+        for ext in ("txt",):
+            for file in Path(folder).glob(f"*.{ext}"):
+                try:
+                    with open(file, 'r', encoding='utf-8') as userban:
+                        for line in userban:
+                            banned.add(line.strip().lower())
+                except:
+                    pass
+        return list(banned)
+
+    def tts_load_config(self):
+        path = Path(__main__.__file__).resolve().parent / 'config' / 'tts_config.json'
+        json_opt = {}
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as file:
+                    json_opt = json.load(file)
+            except:
+                pass
+        for attr in self.opt_config.keys():
+            setattr(self, attr, json_opt.get(attr, self.opt_config.get(attr, None)))
+
+    def tts_save_config(self):
+        json_opt = {}
+        for attr in self.opt_config.keys():
+            json_opt[attr] = getattr(self, attr, None)
+        path = Path(__main__.__file__).resolve().parent / 'config' / 'tts_config.json'
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(json_opt, file, indent=4)
+
+    def mod_load_config(self):
+        path = Path(__main__.__file__).resolve().parent / 'config' / 'mod_config.json'
+        json_opt = {}
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as file:
+                    json_opt = json.load(file)
+            except:
+                pass
+        for attr in self.mod_config.keys():
+            setattr(self, attr, json_opt.get(attr, self.mod_config.get(attr, None)))
+
+    def mod_save_config(self):
+        json_opt = {}
+        for attr in self.mod_config.keys():
+            json_opt[attr] = getattr(self, attr, None)
+        path = Path(__main__.__file__).resolve().parent / 'config' / 'mod_config.json'
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(json_opt, file, indent=4)
+
+    def mod_reload(self):
+        self.mod_re_pattern = self.get_mod_re_pattern()
+        self.mod_banned_users = self.get_mod_banned_users()
+        self.tts_save_config() # Save this as well just for good measure
+        self.mod_save_config()
+
     def __init__(self):
-        self.ref_audio = None
-        self.ref_text = None
         self.ref_vcp = None
-        self.max_len = 500
-        self.max_tokens = 1000
-        self.language = 'English'
-        self.tts_temperature = 0.9
-        self.tts_top_p = 1.0
-        self.tts_top_k = 50
+
+        # Config options
+        self.opt_config = {
+            'max_len': 500,
+            'max_tokens': 1000,
+            'language': 'English',
+            'tts_temperature': 0.9,
+            'tts_top_p': 1.0,
+            'tts_top_k': 50,
+            'ref_audio': None,
+            'ref_text': None,
+        }
+        self.tts_load_config()
+
         self.device = "cpu"
         self.cache = {}
         self.cache_lock = threading.Lock()
@@ -70,33 +138,28 @@ class TTS():
             Path(__main__.__file__).resolve().parent / 'models' / 'vrandan-comment-moderation',
             device_map="cpu",
         )
-        self.mod_enabled = True
-        self.mod_verbose = True
-        self.mod_allow_negative = False
-        self.mod_labels = {
-            # "OK": 0.9, # Appropriate content
-            "H": 0.05,  # Hate
-            "SH": 0.05, # Self-harm
-            "V": 0.05, # Violence
-            "S": 0.05, # Sexual
-            "HR": 0.05, # Harassment
-            "V2": 0.05, # Violence/Graphic
-            "S3": 0.05, # Sexual/Minors
-            "H2": 0.05, # Hate/Threat
+
+        # Moderation options
+        self.mod_config = {
+            "mod_enabled": True,
+            "mod_verbose": True,
+            "mod_allow_negative": False,
+            "mod_labels": {
+                "OK": ["Appropriate content", 0.9, False],
+                "H": ["Hate", 0.1, True],
+                "SH": ["Self-harm", 0.1, True],
+                "V": ["Violence", 0.1, True],
+                "S": ["Sexual", 0.1, True],
+                "HR": ["Harassment", 0.1, True],
+                "V2": ["Violence/Graphic", 0.1, True],
+                "S3": ["Sexual/Minors", 0.1, True],
+                "H2": ["Hate/Threat", 0.1, True],
+            }
         }
-        self.mod_label_meanings = {
-            "OK": "Appropriate content",
-            "H": "Hate",
-            "SH": "Self-harm",
-            "V": "Violence",
-            "S": "Sexual",
-            "HR": "Harassment",
-            "V2": "Violence/Graphic",
-            "S3": "Sexual/Minors",
-            "H2": "Hate/Threat",
-        }
-        self.mod_meaning_labels = {v: k for k, v in self.mod_label_meanings.items()} # Reverse lookup
+        self.mod_load_config()
+        self.mod_meaning_labels = {v[0]: k for k, v in self.mod_labels.items()} # Reverse lookup
         self.mod_re_pattern = self.get_mod_re_pattern()
+        self.mod_banned_users = self.get_mod_banned_users()
 
     # get/set functions
     def get_max_len(self): return self.max_len
@@ -122,9 +185,9 @@ class TTS():
 
     def load_reference(self, sound):
         """ Load reference sound file """
-        self.ref_audio = Path(__main__.__file__).resolve().parent / 'reference' / sound
+        self.ref_audio = str(Path(__main__.__file__).resolve().parent / 'reference' / sound)
 
-        txt_file = self.ref_audio.with_suffix('.txt')
+        txt_file = Path(self.ref_audio).with_suffix('.txt')
         if txt_file.exists():
             with open(txt_file, 'r', encoding='utf-8') as file:
                 self.ref_text = file.read()
@@ -137,6 +200,8 @@ class TTS():
             ref_text = self.ref_text,
             x_vector_only_mode = True
         )
+        self.tts_save_config() # This is as good time as ever to save the config
+        self.mod_save_config()
 
     def set_mod_enabled(self, state):
         self.mod_enabled = state
@@ -145,15 +210,18 @@ class TTS():
         self.mod_verbose = state
 
     def set_mod_level(self, label, value):
-        print(f"DEBUG: {label}: {value}")
-        self.mod_labels[label] = value
+        self.mod_labels[label][1] = value
 
-    def moderate_text(self, text, verbose=False):
+    def moderate_text(self, text, user=None, verbose=False):
         if not self.mod_enabled:
             # If moderations isn't enabled, just allow anything
             return True
 
         if verbose: print(f"\nModeration: Check: {text}")
+
+        if user.lower() in self.mod_banned_users:
+            print(f"{user} is banned.")
+            return False
 
         if self.mod_re_pattern is not None:
             blocklist_words = self.mod_re_pattern.search(text)
@@ -172,15 +240,18 @@ class TTS():
 
         pass_mod = True
         for key in self.mod_labels.keys():
-            status = predictions.get(key, 0.0) <= self.mod_labels[key]
-            pass_mod = pass_mod if status else status
-            if verbose:
-                print(f"[{' OK ' if status else 'FAIL'}]  {self.mod_label_meanings.get(key, '???'):<20} {predictions.get(key, 0.0):.4f}")
+            if self.mod_labels.get(key, [0,0,False])[2]:
+                status = predictions.get(key, 0.0) <= self.mod_labels.get(key, [0,0.0])[1]
+                pass_mod = pass_mod if status else status
+                if verbose:
+                    print(f"[{' OK ' if status else 'FAIL'}]  {self.mod_labels.get(key, ['???'])[0]:<20} {predictions.get(key, 0.0):.4f}")
 
         return pass_mod
 
     def clone_voice(self, text, user="Anonymous"):
         """ Generate audio from text """
+        self.tts_save_config() # This is as good time as ever to save the config
+        self.mod_save_config()
         with self.cache_lock:
             filehash = sha256(
                 f"{text.strip()}|{self.ref_audio}|{self.language}|{self.tts_temperature}|{self.tts_top_p}|{self.tts_top_k}"
@@ -189,7 +260,7 @@ class TTS():
             if filehash in self.cache and self.cache[filehash] is not None:
                 filename = self.cache[filehash]
             else:
-                if self.moderate_text(text, verbose=self.mod_verbose):
+                if self.moderate_text(text, user=user, verbose=self.mod_verbose):
                     print(f"Generating: {user}: {text[:self.max_len]}")
                     wavs, sr = self.model.generate_voice_clone(
                         voice_clone_prompt = self.ref_vcp,

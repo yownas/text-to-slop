@@ -266,22 +266,26 @@ with gr.Blocks() as webui:
                             tts_mod_enabled.change(fn=tts.set_mod_enabled, inputs=tts_mod_enabled)
                             tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose)
                             tts_mod_verbose.change(fn=tts.set_mod_verbose, inputs=tts_mod_verbose)
+                            tts_mod_reload = gr.Button(label = "Reload")
+                            tts_mod_reload.click(fn=tts.mod_reload)
 
                         def update_tts_mod_value(value, evt: gr.EventData):
                             label = tts.mod_meaning_labels.get(evt.target.label, None)
                             if label is not None:
-                                tts.mod_labels[label] = value
+                                tts.mod_labels[label][1] = value
                         with gr.Group():
                             mod_slider = {}
-                            for label in ['H', 'SH', 'V', 'S', 'HR', 'V2', 'S3', 'H2']:
-                                mod_slider[label] = gr.Slider(
-                                    label=tts.mod_label_meanings[label],
-                                    value=tts.mod_labels[label],
-                                    minimum=-1.0 if tts.mod_allow_negative else 0.0,
-                                    maximum=1.0,
-                                    step=0.01,
-                                )
-                                mod_slider[label].change(fn=update_tts_mod_value, inputs=mod_slider[label])
+                            #for label in ['H', 'SH', 'V', 'S', 'HR', 'V2', 'S3', 'H2']:
+                            for label in tts.mod_labels.keys():
+                                if tts.mod_labels[label][2]:
+                                    mod_slider[label] = gr.Slider(
+                                        label=tts.mod_labels[label][0],
+                                        value=tts.mod_labels[label][1],
+                                        minimum=-1.0 if tts.mod_allow_negative else 0.0,
+                                        maximum=1.0,
+                                        step=0.01,
+                                    )
+                                    mod_slider[label].change(fn=update_tts_mod_value, inputs=mod_slider[label])
 
                 gr.Markdown("### Please keep this tab open to keep JavaScript happy.")
             gr.Markdown("https://github.com/yownas/text-to-slop")

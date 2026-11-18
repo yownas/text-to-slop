@@ -28,7 +28,7 @@ Firebot example.
 
 # Usage
 
-* You *MUST* keep the browser tab open, or it won't play submitted texts.
+* You *MUST* keep the browser tab open, or it might not play submitted texts in the browser.
 * The text-to-speech server can run on a separate computer but audio will be played via the browser.
 
 # Saftey and moderation
@@ -37,3 +37,5 @@ TTS uses [Vrandan/Comment-Moderation](https://huggingface.co/Vrandan/Comment-Mod
 
 You can also add txt-files to `config/blocklists/` with one word per line that will be blocked. [google-profanity-words](https://github.com/coffee-and-fun/google-profanity-words/tree/main/data)
 is a good start if you want pre-made lists.
+
+Blocked users can be put in textfiles in `config/userbans`. One username per line.
