@@ -21,16 +21,19 @@ class TTS():
         folder = Path(__main__.__file__).resolve().parent / 'config' / 'blocklists'
 
         blocked = set()
-        for ext in ("txt"):
+        for ext in ("txt",):
             for file in Path(folder).glob(f"*.{ext}"):
                 with open(file, 'r', encoding='utf-8') as blocklist:
                     for line in blocklist:
                         blocked.add(line.strip())
 
-        pattern = re.compile(
-            r"(?<!\w)(?:" + "|".join(map(re.escape, sorted(list(blocked), key=len, reverse=True))) + r")(?!\w)",
-            re.IGNORECASE,
-        )
+        if len(blocked) > 0:
+            pattern = re.compile(
+                r"(?<!\w)(?:" + "|".join(map(re.escape, sorted(blocked, key=len, reverse=True))) + r")(?!\w)",
+                re.IGNORECASE,
+            )
+        else:
+            pattern = None
         return pattern
 
     def __init__(self):
@@ -152,9 +155,11 @@ class TTS():
 
         if verbose: print(f"\nModeration: Check: {text}")
 
-        if self.mod_re_pattern.search(text) is not None:
-            if verbose: print(f"BLOCKED by word list!")
-            return False
+        if self.mod_re_pattern.search is not None:
+            blocklist_words = self.mod_re_pattern.search(text)
+            if blocklist_words is not None:
+                if verbose: print(f"BLOCKED by word list: {blocklist_words.group()}")
+                return False
 
         # Use classifier
         inputs = self.mod_tokenizer(text, return_tensors="pt")
