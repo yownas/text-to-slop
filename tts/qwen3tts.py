@@ -155,7 +155,7 @@ class TTS():
 
         if verbose: print(f"\nModeration: Check: {text}")
 
-        if self.mod_re_pattern.search is not None:
+        if self.mod_re_pattern is not None:
             blocklist_words = self.mod_re_pattern.search(text)
             if blocklist_words is not None:
                 if verbose: print(f"BLOCKED by word list: {blocklist_words.group()}")
