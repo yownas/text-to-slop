@@ -262,11 +262,11 @@ with gr.Blocks() as webui:
                             open = False
                         ):
                         with gr.Row():
-                            tts_mod_enabled = gr.Checkbox(label = "Enabled", value = tts.mod_enabled)
+                            tts_mod_enabled = gr.Checkbox(label = "Enabled", value = tts.mod_enabled, scale = 3)
                             tts_mod_enabled.change(fn=tts.set_mod_enabled, inputs=tts_mod_enabled)
-                            tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose)
+                            tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose, scale = 3)
                             tts_mod_verbose.change(fn=tts.set_mod_verbose, inputs=tts_mod_verbose)
-                            tts_mod_reload = gr.Button(label = "Reload")
+                            tts_mod_reload = gr.Button(value = "Reload", scale = 1)
                             tts_mod_reload.click(fn=tts.mod_reload)
 
                         def update_tts_mod_value(value, evt: gr.EventData):
