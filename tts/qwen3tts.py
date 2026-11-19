@@ -212,6 +212,13 @@ class TTS():
     def set_mod_level(self, label, value):
         self.mod_labels[label][1] = value
 
+    def mod_block_user(self, username):
+        if len(username) > 0:
+            path = Path(__main__.__file__).resolve().parent / 'config' / 'userbans' / f"{slugify(username)}.txt"
+            with open(path, "w", encoding="utf-8") as file:
+                file.write(f"{username}\n")
+        self.mod_reload()
+
     def moderate_text(self, text, user=None, verbose=False):
         if not self.mod_enabled:
             # If moderations isn't enabled, just allow anything

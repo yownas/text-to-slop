@@ -262,6 +262,22 @@ with gr.Blocks() as webui:
                             open = False
                         ):
                         with gr.Row():
+                            def block_user(username):
+                                tts.mod_block_user(username)
+                                gr.Info(f"{username} blocked.")
+                                return gr.update(value="")
+                            with gr.Group():
+                                block_user_btn = gr.Button(
+                                    value = "Block!")
+                                block_user_txt = gr.Textbox(
+                                    label = "Block user",
+                                    show_label = True,
+                                    placeholder = "Username",
+                                    buttons=[block_user_btn]
+                                )
+                            block_user_txt.submit(fn=block_user, inputs=block_user_txt, outputs=block_user_txt)
+                            block_user_btn.click(fn=block_user, inputs=block_user_txt, outputs=block_user_txt)
+                        with gr.Row():
                             tts_mod_enabled = gr.Checkbox(label = "Enabled", value = tts.mod_enabled, scale = 3)
                             tts_mod_enabled.change(fn=tts.set_mod_enabled, inputs=tts_mod_enabled)
                             tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose, scale = 3)
