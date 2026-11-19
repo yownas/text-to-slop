@@ -5,9 +5,12 @@ Local TTS for streamers who don't like cloud services.
 # Installation
 
 Download [start.ps1](https://raw.githubusercontent.com/yownas/text-to-slop/refs/heads/main/start.ps1) to an empty folder, right-click on it and select "Run with PowerShell".
-If it fails you might need to open up PowerShell and run `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`
+
+If it fails you might need to open up a PowerShell and run `Set-ExecutionPolicy Unrestricted -Scope CurrentUser`
 which hopefully will allow you to run it. (I hate Windows)
-Select python. Download TTS. Run.
+You will probably also need Microsoft Visual C++ Redistributable from https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+Then select python. Download TTS. Run.
 
 Place a 3-15 second audio clip in the `reference` folder. You also need to provide the transcript of what is spoken.
 You can either name the file audio file with the phrase in its name `I_cant_run_through_the_mud_in_my_pretty_party_dress.mp3`
