@@ -97,6 +97,22 @@ class TTS():
         self.mod_banned_users = self.get_mod_banned_users()
         self.tts_save_config() # Save this as well just for good measure
         self.mod_save_config()
+        self.tts_set_device()
+
+    def tts_set_device(self):
+        if self.use_cpu:
+            self.device = "cpu"
+            return
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            return
+        elif torch.backends.mps.is_available():
+            self.device = "mps"
+            return
+        elif hasattr(torch, "xpu") and torch.xpu.is_available():
+            self.device = "xpu"
+            return
+        self.device = "cpu"
 
     def __init__(self):
         self.ref_vcp = None
@@ -111,20 +127,13 @@ class TTS():
             'tts_top_k': 50,
             'ref_audio': None,
             'ref_text': None,
+            'use_cpu': False,
         }
         self.tts_load_config()
+        self.tts_set_device()
 
-        self.device = "cpu"
         self.cache = {}
         self.cache_lock = threading.Lock()
-        if torch.cuda.is_available():
-            self.device = "cuda"
-        elif torch.backends.mps.is_available():
-            self.device = "mps"
-        elif hasattr(torch, "xpu") and torch.xpu.is_available():
-            self.device = "xpu"
-        else:
-            self.device = "cpu"
 
         self.model = Qwen3TTSModel.from_pretrained(
             Path(__main__.__file__).resolve().parent / 'models' / 'Qwen3-TTS-12Hz-0.6B-Base',
@@ -182,6 +191,11 @@ class TTS():
     def get_tts_top_k(self): return self.tts_top_k
     def set_tts_top_k(self, top_k): self.tts_top_k = top_k
 
+    def get_use_cpu(self): return self.use_cpu
+    def set_use_cpu(self, use_cpu):
+        self.use_cpu = use_cpu
+        self.tts_set_device()
+        self.load_reference(self.ref_audio) # Re-load reference voice
 
     def load_reference(self, sound):
         """ Load reference sound file """
@@ -192,7 +206,7 @@ class TTS():
             with open(txt_file, 'r', encoding='utf-8') as file:
                 self.ref_text = file.read()
         else:
-            text = Path(self.ref_audio.stem).with_suffix('')
+            text = Path(self.ref_audio).stem.with_suffix('')
             self.ref_text = str(text).replace("_", " ")
 
         self.ref_vcp = self.model.create_voice_clone_prompt(
@@ -202,6 +216,7 @@ class TTS():
         )
         self.tts_save_config() # This is as good time as ever to save the config
         self.mod_save_config()
+        self.tts_set_device()
 
     def set_mod_enabled(self, state):
         self.mod_enabled = state

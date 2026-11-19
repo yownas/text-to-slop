@@ -215,6 +215,11 @@ with gr.Blocks() as webui:
                             label = "Webui user-name",
                             value = "Admin",
                         )
+                        tts_use_cpu = gr.Checkbox(
+                            label = "Use CPU (Slower, but will not use GPU VRAM)",
+                            value = tts.use_cpu,
+                        )
+                        tts_use_cpu.change(fn=tts.set_use_cpu, inputs=tts_use_cpu)
                         max_length = gr.Slider(
                             label = "Max message length (characters)",
                             value = tts.get_max_len(),
