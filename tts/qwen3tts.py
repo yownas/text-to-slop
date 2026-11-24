@@ -113,6 +113,14 @@ class TTS():
             self.device = "xpu"
             return
         self.device = "cpu"
+        self.load_model()
+
+    def load_model(self):
+        self.model = Qwen3TTSModel.from_pretrained(
+            Path(__main__.__file__).resolve().parent / 'models' / 'Qwen3-TTS-12Hz-0.6B-Base',
+            device_map=self.device,
+            dtype=torch.bfloat16,
+        )
 
     def __init__(self):
         self.ref_vcp = None
@@ -135,10 +143,8 @@ class TTS():
         self.cache = {}
         self.cache_lock = threading.Lock()
 
-        self.model = Qwen3TTSModel.from_pretrained(
-            Path(__main__.__file__).resolve().parent / 'models' / 'Qwen3-TTS-12Hz-0.6B-Base',
-            device_map=self.device,
-        )
+        self.load_model()
+
         self.mod_model = AutoModelForSequenceClassification.from_pretrained(
             Path(__main__.__file__).resolve().parent / 'models' / 'vrandan-comment-moderation',
             device_map="cpu",
@@ -295,6 +301,8 @@ class TTS():
                         top_k = int(self.tts_top_k), # 1 - 3072, def 50 
                         top_p = float(self.tts_top_p), # 0.0 - 1.0, def 1.0 
                     )
+                    if self.device == "cuda":
+                        torch.cuda.empty_cache()
                     output = Path(__main__.__file__).resolve().parent / 'output'
                     filename = slugify(f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{text[:20]}") + ".mp3"
                     filename = str(output / filename)
