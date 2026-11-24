@@ -295,6 +295,7 @@ with gr.Blocks() as webui:
                             if label is not None:
                                 tts.mod_labels[label][1] = value
                         with gr.Group():
+                            gr.Markdown("Tolerance level:")
                             mod_slider = {}
                             #for label in ['H', 'SH', 'V', 'S', 'HR', 'V2', 'S3', 'H2']:
                             for label in tts.mod_labels.keys():
@@ -302,9 +303,9 @@ with gr.Blocks() as webui:
                                     mod_slider[label] = gr.Slider(
                                         label=tts.mod_labels[label][0],
                                         value=tts.mod_labels[label][1],
-                                        minimum=-1.0 if tts.mod_allow_negative else 0.0,
-                                        maximum=1.0,
-                                        step=0.01,
+                                        minimum=-1000 if tts.mod_allow_negative else 0,
+                                        maximum=1000,
+                                        step=1,
                                     )
                                     mod_slider[label].change(fn=update_tts_mod_value, inputs=mod_slider[label])
 

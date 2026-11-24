@@ -154,15 +154,15 @@ class TTS():
             "mod_verbose": True,
             "mod_allow_negative": False,
             "mod_labels": {
-                "OK": ["Appropriate content", 0.9, False],
-                "H": ["Hate", 0.1, True],
-                "SH": ["Self-harm", 0.1, True],
-                "V": ["Violence", 0.1, True],
-                "S": ["Sexual", 0.1, True],
-                "HR": ["Harassment", 0.1, True],
-                "V2": ["Violence/Graphic", 0.1, True],
-                "S3": ["Sexual/Minors", 0.1, True],
-                "H2": ["Hate/Threat", 0.1, True],
+                "OK": ["Appropriate content", 9999, False],
+                "H": ["Hate", 100, True],
+                "SH": ["Self-harm", 100, True],
+                "V": ["Violence", 100, True],
+                "S": ["Sexual", 100, True],
+                "HR": ["Harassment", 100, True],
+                "V2": ["Violence/Graphic", 100, True],
+                "S3": ["Sexual/Minors", 100, True],
+                "H2": ["Hate/Threat", 100, True],
             }
         }
         self.mod_load_config()
@@ -263,10 +263,10 @@ class TTS():
         pass_mod = True
         for key in self.mod_labels.keys():
             if self.mod_labels.get(key, [0,0,False])[2]:
-                status = predictions.get(key, 0.0) <= self.mod_labels.get(key, [0,0.0])[1]
+                status = (predictions.get(key, 0) * 1000) <= self.mod_labels.get(key, [0,0.0])[1]
                 pass_mod = pass_mod if status else status
                 if verbose:
-                    print(f"[{' OK ' if status else 'FAIL'}]  {self.mod_labels.get(key, ['???'])[0]:<20} {predictions.get(key, 0.0):.4f}")
+                    print(f"[{' OK ' if status else 'FAIL'}]  {self.mod_labels.get(key, ['???'])[0]:<20} {int(predictions.get(key, 0) * 1000):>4d}")
 
         return pass_mod
 
