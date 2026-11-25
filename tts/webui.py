@@ -89,26 +89,29 @@ def sound_get(
 def update_queue():
     """ Update webui """
     global items, played_list
-    queue_md = ""
+    queue_html = "<ul>"
     if items:
         for item in items:
-            queue_md += "* [{time}] **{name}:** {text}\n".format(
+            queue_html += "<li><a href=# onClick=\"js_command('skip {time}'); return false;\">[{time}]</a> <b>{name}:</b> {text}\n".format(
                 name = html.escape(item[0]),
                 text = html.escape(item[1]),
                 time = html.escape(item[2]),
             )
-    played_md = ""
+    queue_html += "</ul>"
+    played_html = "<ul>"
     if played_list:
         for item in reversed(played_list):
-            played_md += "* [{time}] **{name}:** {text}\n".format(
+            played_html += "<li><a href=# onClick=\"js_command('play {file}'); return false;\">[{time}]</a> <b>{name}:</b> {text}\n".format(
                 name = html.escape(item[0]),
                 text = html.escape(item[1]),
                 time = html.escape(item[2]),
+                file = html.escape(item[3]),
             )
+    played_html += "</ul>"
 
     return [
-        gr.update(value=queue_md),
-        gr.update(value=played_md),
+        gr.update(value=queue_html),
+        gr.update(value=played_html),
     ]
 
 def get_items(text):
@@ -313,10 +316,39 @@ with gr.Blocks() as webui:
             gr.Markdown("https://github.com/yownas/text-to-slop")
 
         with gr.Column():
+            js_command = gr.Textbox(
+                value = "",
+                elem_id = "js_command",
+                visible = 'hidden',
+            )
+            def run_js_command(argv):
+                global items
+
+                play = gr.update()
+                args = argv.split(' ', 1)
+                if len(args) == 2:
+                    if args[0] == 'play':
+                        play = gr.update(
+                            label=str(Path(args[1]).name),
+                            value=args[1],
+                        )
+                    elif args[0] == 'skip':
+                        # Remove queued item that match timestamp
+                        items = [item for item in items if item[2] != args[1]]
+
+                return [
+                    gr.update(value = ""),
+                    play
+                ]
+            js_command.change(
+                fn=run_js_command,
+                inputs=[js_command],
+                outputs=[js_command, slop_voice],
+            )
             gr.Markdown("## Request queue:")
-            table = gr.Markdown(sanitize_html=True)
+            table = gr.HTML()
             gr.Markdown("## Played:")
-            played = gr.Markdown(sanitize_html=True)
+            played = gr.HTML()
 
             queue_timer = gr.Timer(2)
             timer = gr.Timer(2)
@@ -333,10 +365,21 @@ with gr.Blocks() as webui:
         outputs=[queue_name, queue_text, hidden_trigger]
     )
     # fill on page load
+    hook_js = """
+() => {
+  window.js_command = (text) => {
+    const el = document.querySelector('#js_command textarea, #js_command input');
+    if (!el) return;
+    el.value = text;
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+  };
+}
+"""
     webui.load(
         fn=get_items,
         inputs=[queue_text],
-        outputs=[queue_name, queue_text, hidden_trigger]
+        outputs=[queue_name, queue_text, hidden_trigger],
+        js=hook_js,
     )
     input_text.submit(
         fn=clone_voice,
