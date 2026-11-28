@@ -39,7 +39,7 @@ tts.load_reference(reference_voices[0])
 
 ID = 0
 max_queue = 10
-inbox_list = [] # [ID, user, text, datetime.now().strftime("%H:%M:%S"), isok]
+inbox_list = [] # [ID, user, text, datetime.now().strftime("%H:%M:%S"), isok, play_in_browser]
 
 queue_list = []                 # shared state
 played_list = []
@@ -85,14 +85,16 @@ def submit_get(
     with lock:
         if len(queue_list) < max_queue:
             ID += 1
-            inbox_list.append([ID, user, text, datetime.now().strftime("%H:%M:%S"), False])
+            inbox_list.append([ID, user, text, datetime.now().strftime("%H:%M:%S"), False, True])
             ok_status = True
-            status = f"Place in queue: {len(inbox_list)}"
+            status = f"Place in queue: {len(queue_list)}"
         else:
             ok_status = False
             status = "Queue full"
 
         return {"ok": ok_status, "status": status}
+
+web_lock = threading.Lock()
 
 @app.get("/sound")
 def sound_get(
@@ -102,9 +104,26 @@ def sound_get(
     """ Get sound file directly via fastapi """
     global ID, queue_list, played_list
 
-    # FIXME add to queue, moderated
     text = scrub_input(text)
-    path = clone_voice(user, text, return_file=True)
+    with web_lock:
+        # Check if we already got this request
+        path = ""
+        for i, item in enumerate(played_list):
+            if item[1] == user and item[2] == text:
+                path = item[4]
+                break
+
+        if path == "":
+            with lock:
+                if len(queue_list) < max_queue:
+                    ID += 1
+                    inbox_list.append([ID, user, text, datetime.now().strftime("%H:%M:%S"), False, False])
+
+        while path == "":
+            for i, item in enumerate(played_list):
+                if item[0] == ID:
+                    path = item[4]
+            time.sleep(0.2)
 
     return FileResponse(
         path=str(path),
@@ -116,7 +135,7 @@ def update_queue():
     global queue_list, played_list
     queue_html = "<ul>"
     if queue_list:
-        for item in queue_list:
+        for item in reversed(queue_list):
             queue_html += """<li>
             <a href=# onClick=\"js_command('skip {qid}'); return false;\">🚮</a>
             [{time}]
@@ -147,7 +166,7 @@ def update_queue():
 
 def get_items(enabled, text):
     """ Update webui with data """
-    global queue_list
+    global queue_list, played_list
     if not enabled:
         return [gr.update(), gr.update(), gr.update()]
     now = None
@@ -160,11 +179,27 @@ def get_items(enabled, text):
                     now=datetime.now().strftime("%H:%M:%S")
                     break
 
-        return [
-            gr.update() if top_item is None else gr.update(value=top_item[1]), # User
-            gr.update() if top_item is None else gr.update(value=top_item[2]), # Text
-            gr.update() if now is None else gr.update(value=now),
-        ]
+        if top_item is None: # No approved post found
+            return [
+                gr.update(),
+                gr.update(),
+                gr.update()
+            ]
+
+        if top_item[5]: # Queue to play in webui
+            return [
+                gr.update(value=top_item[1]), # User
+                gr.update(value=top_item[2]), # Text
+                gr.update(value=now)
+            ]
+        else:
+            path = tts.clone_voice(top_item[2], user=top_item[1]) # FIXME should use clone_voice?
+            played_list.append([top_item[0], top_item[1], top_item[2], now, path])
+            return [
+                gr.update(),
+                gr.update(),
+                gr.update()
+            ]
 
 def clone_voice(user, text, return_file=False):
     """ Generate sound clip """

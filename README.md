@@ -24,7 +24,7 @@ Firebot example.
 
 `http://127.0.0.1:7860/submit?user=$encodeForUrl[$user]&text=$encodeForUrl[$arg[all]]&rnd=$randomUUID`
 
-### Retrieve the soundclip to play in Firebot (this will bypass the auto-moderation!)
+### Retrieve the soundclip to play in Firebot
 
 `http://127.0.0.1:7860/sound?user=$user&text=$encodeForUrl[$chatMessage]&rnd=$randomUUID`
 
