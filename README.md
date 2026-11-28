@@ -24,15 +24,18 @@ Firebot example.
 
 `http://127.0.0.1:7860/submit?user=$encodeForUrl[$user]&text=$encodeForUrl[$arg[all]]&rnd=$randomUUID`
 
-### Retrieve the soundclip to play in Firebot
+### Retrieve the soundclip to play in Firebot (this will bypass the auto-moderation!)
 
 `http://127.0.0.1:7860/sound?user=$user&text=$encodeForUrl[$chatMessage]&rnd=$randomUUID`
-
 
 # Usage
 
 * You *MUST* keep the browser tab open, or it might not play submitted texts in the browser.
 * The text-to-speech server can run on a separate computer but audio will be played via the browser.
+
+* The `Request queue` checkbox enable/disable processing of the queue.
+* Clicking the litter bin icon will remove the request from the list.
+* The thumbs up/red X toggle will allow the item to be processed. Items that hasn't been auto-approved will stay in the queue.
 
 # Saftey and moderation
 
