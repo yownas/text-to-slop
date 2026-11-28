@@ -3,12 +3,14 @@ webui for text-to-slop - a silly locally run text-to-speech
 '''
 
 from tts.qwen3tts import TTS
+from tts.mod import MOD
 from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse
 import gradio as gr
 from datetime import datetime
 import html
 import os
+import time
 from pathlib import Path
 import re
 import threading
@@ -31,16 +33,37 @@ def update_reference_voices():
     return gr.update(choices=reference_voices)
 
 tts = TTS()
+mod = MOD()
 update_reference_voices()
 tts.load_reference(reference_voices[0])
 
-items = []                 # shared state
-max_items = 10
+ID = 0
+max_queue = 10
+inbox_list = [] # [ID, user, text, datetime.now().strftime("%H:%M:%S"), isok]
+
+queue_list = []                 # shared state
 played_list = []
 
 # HTTP api...
 lock = threading.Lock()
 app = FastAPI()
+
+# Moderator thread
+def mod_worker():
+    """
+    Check inbox and move text to TTS queue if they are appropriate
+    """
+    global mod, lock, inbox_list, queue_list
+
+    print(f"Slop moderator started...")
+    while True:
+        with lock:
+            if len(inbox_list) > 0:
+                post = inbox_list.pop(0)
+                post[4] = mod.moderate_text(post[2], user=post[1])
+                queue_list.append(post)
+        time.sleep(0.3)
+threading.Thread(target=mod_worker, daemon=True).start()
 
 def scrub_input(text):
     '''
@@ -56,14 +79,15 @@ def submit_get(
     user: str = Query(..., min_length=1),
 ):
     """ Handle submissions via fastapi """
-    global items, max_items
+    global ID, inbox_list, max_queue
 
     text = scrub_input(text)
     with lock:
-        if len(items) < max_items:
-            items.append([user, text, datetime.now().strftime("%H:%M:%S")])
+        if len(queue_list) < max_queue:
+            ID += 1
+            inbox_list.append([ID, user, text, datetime.now().strftime("%H:%M:%S"), False])
             ok_status = True
-            status = f"Place in queue: {len(items)}"
+            status = f"Place in queue: {len(inbox_list)}"
         else:
             ok_status = False
             status = "Queue full"
@@ -76,8 +100,9 @@ def sound_get(
     user: str = Query(..., min_length=1),
 ):
     """ Get sound file directly via fastapi """
-    global played_list
+    global ID, queue_list, played_list
 
+    # FIXME add to queue, moderated
     text = scrub_input(text)
     path = clone_voice(user, text, return_file=True)
 
@@ -88,24 +113,30 @@ def sound_get(
 
 def update_queue():
     """ Update webui """
-    global items, played_list
+    global queue_list, played_list
     queue_html = "<ul>"
-    if items:
-        for item in items:
-            queue_html += "<li><a href=# onClick=\"js_command('skip {time}'); return false;\">[{time}]</a> <b>{name}:</b> {text}\n".format(
-                name = html.escape(item[0]),
-                text = html.escape(item[1]),
-                time = html.escape(item[2]),
+    if queue_list:
+        for item in queue_list:
+            queue_html += """<li>
+            <a href=# onClick=\"js_command('skip {qid}'); return false;\">🚮</a>
+            [{time}]
+            <a href=# onClick=\"js_command('toggleok {qid}'); return false;\">{isok}</a>
+            <b>{user}:</b> {text}\n""".format(
+                qid = str(item[0]),
+                user = html.escape(item[1]),
+                text = html.escape(item[2]),
+                time = html.escape(item[3]),
+                isok = "👍" if item[4] else "❌",
             )
     queue_html += "</ul>"
     played_html = "<ul>"
     if played_list:
         for item in reversed(played_list):
-            played_html += "<li><a href=# onClick=\"js_command('play {file}'); return false;\">[{time}]</a> <b>{name}:</b> {text}\n".format(
-                name = html.escape(item[0]),
-                text = html.escape(item[1]),
-                time = html.escape(item[2]),
-                file = html.escape(item[3]),
+            played_html += "<li><a href=# onClick=\"js_command('play {file}'); return false;\">[{time}]</a> <b>{user}:</b> {text}\n".format(
+                user = html.escape(item[1]),
+                text = html.escape(item[2]),
+                time = html.escape(item[3]),
+                file = html.escape(item[4]),
             )
     played_html += "</ul>"
 
@@ -114,19 +145,24 @@ def update_queue():
         gr.update(value=played_html),
     ]
 
-def get_items(text):
+def get_items(enabled, text):
     """ Update webui with data """
-    global items
+    global queue_list
+    if not enabled:
+        return [gr.update(), gr.update(), gr.update()]
     now = None
     with lock:
         top_item = None
-        if text == "" and len(items) > 0:
-            top_item = items.pop(0)
-            now=datetime.now().strftime("%H:%M:%S")
+        if text == "" and len(queue_list) > 0:
+            for i, item in enumerate(queue_list):
+                if item[4]: # isok?
+                    top_item = queue_list.pop(i)
+                    now=datetime.now().strftime("%H:%M:%S")
+                    break
 
         return [
-            gr.update() if top_item is None else gr.update(value=top_item[0]), # User
-            gr.update() if top_item is None else gr.update(value=top_item[1]), # Text
+            gr.update() if top_item is None else gr.update(value=top_item[1]), # User
+            gr.update() if top_item is None else gr.update(value=top_item[2]), # Text
             gr.update() if now is None else gr.update(value=now),
         ]
 
@@ -142,21 +178,14 @@ def clone_voice(user, text, return_file=False):
     path = tts.clone_voice(text, user=user)
     with lock:
         now = datetime.now().strftime("%H:%M:%S")
-        played_list.append([user, ("**BLOCKED** " if path is None else "") + text, now, path])
+        played_list.append([0, user, text, now, path])
         if return_file:
             return(path)
         else:
-            if path is None:
-                gr.Warning(f"{user} sent a message that was blocked!")
-                return [
-                    gr.update(),
-                    gr.update(value="")
-                ]
-            else:
-                return [
-                    gr.update(label=text, value=path),
-                    gr.update(value="")
-                ]
+            return [
+                gr.update(label=text, value=path),
+                gr.update(value="")
+            ]
 
 def select_voice(voice): tts.load_reference(voice)
 def select_language(lang): tts.set_language(lang)
@@ -271,7 +300,7 @@ with gr.Blocks() as webui:
                         ):
                         with gr.Row():
                             def block_user(username):
-                                tts.mod_block_user(username)
+                                mod.mod_block_user(username)
                                 gr.Info(f"{username} blocked.")
                                 return gr.update(value="")
                             with gr.Group():
@@ -286,27 +315,25 @@ with gr.Blocks() as webui:
                             block_user_txt.submit(fn=block_user, inputs=block_user_txt, outputs=block_user_txt)
                             block_user_btn.click(fn=block_user, inputs=block_user_txt, outputs=block_user_txt)
                         with gr.Row():
-                            tts_mod_enabled = gr.Checkbox(label = "Enabled", value = tts.mod_enabled, scale = 3)
-                            tts_mod_enabled.change(fn=tts.set_mod_enabled, inputs=tts_mod_enabled)
-                            tts_mod_verbose = gr.Checkbox(label = "Verbose", value = tts.mod_verbose, scale = 3)
-                            tts_mod_verbose.change(fn=tts.set_mod_verbose, inputs=tts_mod_verbose)
+                            tts_mod_enabled = gr.Checkbox(label = "Automod enabled", value = mod.mod_enabled, scale = 3)
+                            tts_mod_enabled.change(fn=mod.set_mod_enabled, inputs=tts_mod_enabled)
                             tts_mod_reload = gr.Button(value = "Reload", scale = 1)
-                            tts_mod_reload.click(fn=tts.mod_reload)
+                            tts_mod_reload.click(fn=mod.mod_reload)
 
                         def update_tts_mod_value(value, evt: gr.EventData):
-                            label = tts.mod_meaning_labels.get(evt.target.label, None)
+                            label = mod.mod_meaning_labels.get(evt.target.label, None)
                             if label is not None:
-                                tts.mod_labels[label][1] = value
+                                mod.mod_labels[label][1] = value
                         with gr.Group():
                             gr.Markdown("Tolerance level:")
                             mod_slider = {}
                             #for label in ['H', 'SH', 'V', 'S', 'HR', 'V2', 'S3', 'H2']:
-                            for label in tts.mod_labels.keys():
-                                if tts.mod_labels[label][2]:
+                            for label in mod.mod_labels.keys():
+                                if mod.mod_labels[label][2]:
                                     mod_slider[label] = gr.Slider(
-                                        label=tts.mod_labels[label][0],
-                                        value=tts.mod_labels[label][1],
-                                        minimum=-1000 if tts.mod_allow_negative else 0,
+                                        label=mod.mod_labels[label][0],
+                                        value=mod.mod_labels[label][1],
+                                        minimum=-1000 if mod.mod_allow_negative else 0,
                                         maximum=1000,
                                         step=1,
                                     )
@@ -322,7 +349,7 @@ with gr.Blocks() as webui:
                 visible = 'hidden',
             )
             def run_js_command(argv):
-                global items
+                global queue_list
 
                 play = gr.update()
                 args = argv.split(' ', 1)
@@ -334,7 +361,12 @@ with gr.Blocks() as webui:
                         )
                     elif args[0] == 'skip':
                         # Remove queued item that match timestamp
-                        items = [item for item in items if item[2] != args[1]]
+                        queue_list = [item for item in queue_list if int(item[0]) != int(args[1])]
+                    elif args[0] == 'toggleok':
+                        for i, item in enumerate(queue_list):
+                            if int(queue_list[i][0]) == int(args[1]):
+                                queue_list[i][4] = not queue_list[i][4]
+                                break
 
                 return [
                     gr.update(value = ""),
@@ -345,13 +377,13 @@ with gr.Blocks() as webui:
                 inputs=[js_command],
                 outputs=[js_command, slop_voice],
             )
-            gr.Markdown("## Request queue:")
+            requests_check = gr.Checkbox(label = "Request queue", value = True)
             table = gr.HTML()
             gr.Markdown("## Played:")
             played = gr.HTML()
 
-            queue_timer = gr.Timer(2)
-            timer = gr.Timer(2)
+            queue_timer = gr.Timer(0.3)
+            timer = gr.Timer(1)
             queue_name = gr.State("")
             queue_text = gr.State("")
 
@@ -361,7 +393,7 @@ with gr.Blocks() as webui:
     )
     timer.tick(
         fn=get_items,
-        inputs=[queue_text],
+        inputs=[requests_check, queue_text],
         outputs=[queue_name, queue_text, hidden_trigger]
     )
     # fill on page load
@@ -377,7 +409,7 @@ with gr.Blocks() as webui:
 """
     webui.load(
         fn=get_items,
-        inputs=[queue_text],
+        inputs=[requests_check, queue_text],
         outputs=[queue_name, queue_text, hidden_trigger],
         js=hook_js,
     )

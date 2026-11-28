@@ -36,9 +36,12 @@ Firebot example.
 
 # Saftey and moderation
 
-TTS uses [Vrandan/Comment-Moderation](https://huggingface.co/Vrandan/Comment-Moderation) to classify text messages and optionally block them.
+All messages will be stuck in the "Request queue" until they are deleted or approved.
+
+TTS uses [Vrandan/Comment-Moderation](https://huggingface.co/Vrandan/Comment-Moderation) to classify text messages and can approve messages if enabled.
 
 You can also add txt-files to `config/blocklists/` with one word per line that will be blocked. [google-profanity-words](https://github.com/coffee-and-fun/google-profanity-words/tree/main/data)
 is a good start if you want pre-made list. The name of the file isn't important as long as it has a .txt suffix. All .txt files will be read and used.
 
 Blocked users can be put in .txt-files in `config/userbans`. One username per line. As with wordlists, you can have multiple files.
+
